@@ -1,6 +1,4 @@
-# claudex ⚡
-
-A supercharged Claude Code CLI wrapper. Pick your role, pick your model, then launch straight into a full Claude Code session — with your context already active.
+<div align="center">
 
 ```
   ██████╗██╗      █████╗ ██╗   ██╗██████╗ ███████╗██╗  ██╗
@@ -11,110 +9,119 @@ A supercharged Claude Code CLI wrapper. Pick your role, pick your model, then la
    ╚═════╝╚══════╝╚═╝  ╚═╝ ╚═════╝ ╚═════╝ ╚══════╝╚═╝  ╚═╝
 ```
 
+**A supercharged Claude Code CLI wrapper**
+
+Pick your role. Pick your model. Launch with context. Track your costs.
+
+[![npm version](https://img.shields.io/npm/v/claude-x?color=cyan)](https://www.npmjs.com/package/claude-x)
+[![license](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+[![node](https://img.shields.io/badge/node-18%2B-brightgreen)](https://nodejs.org)
+[![platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey)](#install)
+
+</div>
+
 ---
 
 ## What is claudex?
 
-Claude Code is powerful but starts every session as a blank slate. claudex solves that by:
+Claude Code is powerful — but it starts every session as a blank slate with no context about what kind of work you're doing.
 
-1. Letting you pick a **role** (Developer, Designer, or Product Manager)
-2. Letting you pick a **Claude model** (Opus 4.6, Sonnet 4.6, Haiku 4.5)
-3. Writing a tailored **system prompt** into `CLAUDE.md` in your project
-4. Launching **Claude Code** — identical to running `claude` directly, but with your role context active from message one
+**claudex fixes that.** It wraps Claude Code with:
 
-You only ever run `claudex`. Claude Code is auto-detected and started for you.
+- 🎭 **Role system** — Developer, Designer, or PM mode with tailored system prompts
+- 🤖 **Model picker** — Choose Opus 4.6, Sonnet 4.6, or Haiku 4.5 at launch
+- 💰 **Cost tracking** — See exactly what each session costs in USD
+- 📊 **Stats dashboard** — Total spend, usage by role and model
+- 📋 **Session history** — Every session logged, resumable
+- ⚡ **Prompt templates** — Fire pre-built prompts for reviews, PRDs, refactors, and more
+- 🧠 **Project memory** — Remembers your last role and model per project
+
+You run `claudex`. It sets up context and launches Claude Code for you.
+
+---
+
+## How it works
+
+```
+claudex
+  │
+  ├── You pick: role (Dev / Designer / PM)
+  ├── You pick: model (Opus / Sonnet / Haiku)
+  ├── claudex writes role system prompt → CLAUDE.md
+  └── Claude Code launches with your context active from message one
+```
+
+When you exit, claudex shows a session summary:
+
+```
+  ────────────────────────────────────────────
+  claudex — session ended
+  ────────────────────────────────────────────
+
+  Role      🧑‍💻 Developer
+  Model     Sonnet 4.6
+  Duration  14m 32s
+
+  Tokens    12,400 in / 3,200 out
+  Cost      $0.085
+
+  All-time  $2.34 across 28 sessions
+
+  ────────────────────────────────────────────
+```
 
 ---
 
 ## Requirements
 
 - **Node.js 18+**
-- **Claude Code** installed and authenticated
-
-### Install Claude Code
-
-**Windows (PowerShell):**
-```powershell
-npm install -g @anthropic-ai/claude-code
-claude login
-```
-
-**macOS / Linux:**
-```bash
-npm install -g @anthropic-ai/claude-code
-claude login
-```
-
-> claudex will detect Claude Code automatically. If it's not installed, claudex will offer to install it for you when you first run it.
+- **Claude Code** installed (`npm install -g @anthropic-ai/claude-code`)
+- **Anthropic account** (free or paid) authenticated via `claude login`
 
 ---
 
-## Install claudex
+## Install
 
-**Windows (PowerShell):**
-```powershell
-# 1. Extract the downloaded archive
-tar -xzf claudex.tar.gz
-cd claudex
-
-# 2. Install dependencies
-npm install
-
-# 3. Link globally so claudex works anywhere
-npm link
-```
-
-**macOS / Linux:**
 ```bash
-tar -xzf claudex.tar.gz
+# Clone the repo
+git clone https://github.com/yourusername/claudex
 cd claudex
+
+# Install dependencies
 npm install
+
+# Link globally — makes `claudex` available anywhere in your terminal
 npm link
 ```
 
-Verify it works:
+> **Windows:** Run PowerShell as Administrator when running `npm link`
+
+Verify:
 ```bash
 claudex --help
 ```
 
-> **Windows note:** If `npm link` gives a permissions error, run PowerShell as Administrator first.
-
 ---
 
-## First-time setup
-
-Run the setup wizard to set your defaults:
+## Quick Start
 
 ```bash
+# 1. Run setup wizard (once)
 claudex init
-```
 
-It will ask you:
+# 2. Go to your project
+cd my-project
 
-| Setting | Options | Default |
-|---|---|---|
-| Default role | dev / design / pm | dev |
-| Default model | opus / sonnet / haiku | sonnet |
-| Budget alert | any USD amount | $5.00 |
-| Create `.claudex.json`? | y / n | y |
-
-Your choices are saved globally and optionally as `.claudex.json` in your project directory.
-
----
-
-## Usage
-
-### Interactive mode (recommended)
-```bash
+# 3. Launch
 claudex
 ```
 
-Shows a role picker then a model picker. Press Enter to accept the default (shown in brackets), or type a number to choose.
+You'll see role and model pickers. Press Enter to accept defaults, or type a number:
 
 ```
   Choose a role:
 
-    1.  🧑‍💻  Developer            Clean, maintainable, production-ready code
+    1.  🧑‍💻  Developer            Clean, maintainable, production-ready code  ← last used
     2.  🎨  Designer             User experience, accessibility (WCAG)
     3.  📋  Product Manager      User stories, acceptance criteria
 
@@ -123,34 +130,33 @@ Shows a role picker then a model picker. Press Enter to accept the default (show
   Choose a model:
 
     1.  Opus 4.6        Most capable — coding, agents, 1M context, best reasoning
-    2.  Sonnet 4.6      Recommended — near-Opus performance, fast, 1M context  ← default
+    2.  Sonnet 4.6      Recommended — near-Opus performance, fast, 1M context     ← last used
     3.  Haiku 4.5       Fastest & cheapest — quick tasks, high volume
 
   Enter number [2]:
 ```
 
-claudex then injects your role into `CLAUDE.md` and launches Claude Code.
+---
 
-### Skip the pickers with flags
+## All Commands
+
+| Command | Description |
+|---|---|
+| `claudex` | Interactive launcher — pick role + model |
+| `claudex init` | First-time setup wizard |
+| `claudex models` | List all available models |
+| `claudex history` | Table of past sessions with cost + duration |
+| `claudex stats` | Full cost dashboard by role and model |
+| `claudex resume` | Pick a past Claude Code session to continue |
+| `claudex use` | Pick a prompt template, then launch |
+| `claudex --help` | Show help |
+
+### Skip pickers with flags
+
 ```bash
-# Skip both pickers — launch directly
-claudex --role=design --model=opus
-
-# Skip role picker only (still asks model)
-claudex --role=pm
-
-# Skip model picker only (still asks role)
-claudex --model=haiku
-
-# Shorthand model names work
-claudex --role=dev --model=sonnet
-```
-
-### Quick launch by role
-```bash
-claudex --role=dev      # Developer + default model
-claudex --role=design   # Designer + default model
-claudex --role=pm       # Product Manager + default model
+claudex --role=design --model=opus    # launch directly, no prompts
+claudex --role=dev                    # skip role picker only
+claudex --model=haiku                 # skip model picker only
 ```
 
 ---
@@ -158,48 +164,151 @@ claudex --role=pm       # Product Manager + default model
 ## Roles
 
 ### 🧑‍💻 Developer (`--role=dev`)
-The default role. Focused on writing clean, production-ready code.
+Default role. Focused on clean, production-ready code.
 
-System prompt covers: clean/maintainable code, design patterns, architecture, performance, security, testing, debugging.
+Covers: design patterns, architecture, performance, security, testing, debugging.
 
-Best for: feature development, code reviews, refactoring, debugging, architecture decisions.
+Best for: feature work, code reviews, refactoring, debugging, architecture.
 
 ### 🎨 Designer (`--role=design`)
-Focused on UI/UX and frontend implementation.
+Focused on UI/UX and frontend.
 
-System prompt covers: UX/accessibility (WCAG), design systems, CSS/animations, responsive design, Figma-to-code, typography, visual polish.
+Covers: accessibility (WCAG), design systems, CSS/animations, responsive design, Figma-to-code, visual polish.
 
-Best for: building components, CSS work, accessibility audits, design reviews, animations.
+Best for: building components, CSS, accessibility audits, animations.
 
 ### 📋 Product Manager (`--role=pm`)
-Focused on product thinking and communication.
+Focused on product thinking.
 
-System prompt covers: user stories, acceptance criteria, RICE/MoSCoW prioritization, sprint planning, roadmaps, stakeholder communication, KPIs.
+Covers: user stories, PRDs, RICE/MoSCoW prioritization, roadmaps, KPIs, stakeholder comms.
 
-Best for: writing PRDs, user stories, feature briefs, prioritization, retros.
+Best for: PRDs, user stories, feature briefs, prioritization, retros.
 
 ---
 
 ## Models
 
-| Model | Shorthand | API ID | Best for |
+| Model | Shorthand | Best for | Cost |
 |---|---|---|---|
-| Opus 4.6 | `opus` | `claude-opus-4-6` | Complex reasoning, long tasks, best quality |
-| Sonnet 4.6 | `sonnet` | `claude-sonnet-4-6` | Everyday coding, near-Opus quality, recommended |
-| Haiku 4.5 | `haiku` | `claude-haiku-4-5` | Quick tasks, high-volume, fastest & cheapest |
+| Opus 4.6 | `opus` | Complex reasoning, long tasks, agents | $5 / $25 per 1M tokens |
+| Sonnet 4.6 | `sonnet` | Everyday coding, near-Opus quality ⭐ | $3 / $15 per 1M tokens |
+| Haiku 4.5 | `haiku` | Quick tasks, high volume, cheapest | $0.80 / $4 per 1M tokens |
 
-> Haiku 4.6 has not been released yet — Haiku 4.5 is the current fast/cheap option.
-
-List models anytime:
 ```bash
-claudex models
+claudex models    # see full list with descriptions
 ```
 
 ---
 
-## How the role injection works
+## Prompt Templates
 
-When you launch claudex, it writes your selected role's system prompt into `CLAUDE.md` in your current working directory:
+Run `claudex use` to pick a template before launching. Templates inject a pre-built prompt into your session so Claude starts working immediately.
+
+**Developer templates:** Code Review, Refactor, Debug, Write Tests, Explain Code, Optimize, Write Docs
+
+**Designer templates:** UX Review, Build Component, Make Responsive, Accessibility Audit, Add Animation, Design Tokens
+
+**PM templates:** User Story, Write PRD, Prioritize (RICE), Project Brief, Retro, Define Metrics
+
+Add your own in `.claudex.json`:
+```json
+{
+  "templates": {
+    "dev": {
+      "mytemplate": {
+        "label": "My Custom Template",
+        "prompt": "Do this specific thing to my code:\n\n"
+      }
+    }
+  }
+}
+```
+
+---
+
+## Cost Tracking & Stats
+
+claudex tracks every session automatically. No setup needed.
+
+```bash
+claudex stats
+```
+
+```
+  claudex stats
+  ────────────────────────────────────────────
+
+  Overview
+
+  Total sessions    28
+  Total cost        $4.821
+  Total tokens      2.1M
+  Avg per session   $0.172
+
+  By Role
+
+  🧑‍💻 Developer        ████████░░░░   18 sessions   $3.201
+  🎨 Designer          ████░░░░░░░░    7 sessions   $1.124
+  📋 Product Manager   ██░░░░░░░░░░    3 sessions   $0.496
+
+  By Model
+
+  Sonnet 4.6           ████████████   22 sessions   $2.940
+  Opus 4.6             ████░░░░░░░░    4 sessions   $1.620
+  Haiku 4.5            ██░░░░░░░░░░    2 sessions   $0.261
+```
+
+```bash
+claudex history    # full session log
+```
+
+---
+
+## Session History & Resume
+
+```bash
+claudex history      # list all sessions
+claudex resume       # pick a past session to continue
+```
+
+Resume opens a picker showing your recent Claude Code sessions. Select one to pick up exactly where you left off.
+
+---
+
+## Project Memory
+
+claudex remembers your last role and model **per project folder**. Next time you run `claudex` in the same directory, it pre-selects what you used last (shown as `← last used`).
+
+Override anytime by picking a different option.
+
+---
+
+## Project Config
+
+Create `.claudex.json` in any project to set per-project defaults:
+
+```json
+{
+  "defaultRole": "design",
+  "defaultModel": "claude-opus-4-6",
+  "templates": {
+    "design": {
+      "brandreview": {
+        "label": "Brand Review",
+        "prompt": "Review this against our brand guidelines:\n\n"
+      }
+    }
+  }
+}
+```
+
+Commit it to share defaults with your team, or add to `.gitignore` to keep it personal.
+
+---
+
+## How Role Injection Works
+
+claudex writes your role's system prompt into `CLAUDE.md` in your project:
 
 ```markdown
 # claudex — Active Role: Designer 🎨
@@ -212,114 +321,82 @@ You are an expert UI/UX designer and frontend developer. Focus on:
 <!-- claudex:model:claude-sonnet-4-6 -->
 ```
 
-Claude Code reads `CLAUDE.md` automatically on startup as its system context. Your role is active from your very first message.
+Claude Code reads `CLAUDE.md` automatically on startup. Your role is active from message one.
 
-**Your existing `CLAUDE.md` is safe.** If you already have project notes in `CLAUDE.md`, claudex preserves them below the role block. Switching roles only replaces the claudex-managed section.
-
----
-
-## Auto-detection of Claude Code
-
-claudex automatically detects the Claude Code command on your system. It tries:
-
-1. `claude`
-2. `claude-code`
-3. `claude-cli`
-
-On **Windows**, it uses `where.exe` for detection and spawns the `.cmd` version automatically — no manual configuration needed.
-
-If Claude Code is not found, claudex will:
-- Show you the install command
-- Offer to run the install for you
-- Exit cleanly with next steps
-
----
-
-## Project-level config
-
-Create a `.claudex.json` in any project folder to override your global defaults for that project:
-
-```json
-{
-  "defaultRole": "design",
-  "defaultModel": "claude-opus-4-6"
-}
-```
-
-claudex merges project config over global config, so per-project settings always win.
-
----
-
-## Subcommands
-
-| Command | Description |
-|---|---|
-| `claudex` | Interactive role + model picker, then launch |
-| `claudex init` | Run the setup wizard |
-| `claudex models` | List all available models with descriptions |
-| `claudex --help` | Show usage and all flags |
-
----
-
-## Tips
-
-**Switch roles between tasks** — exit Claude Code (`/exit` or Ctrl+C), run `claudex --role=pm`, and you're back in with a fresh role context.
-
-**Pin a model per project** by setting `defaultModel` in `.claudex.json`. Useful if one project always needs Opus and another is fine with Haiku.
-
-**Add `.claudex.json` to `.gitignore`** if you don't want teammates picking up your personal defaults, or commit it to share project defaults with your team.
-
-**Role prompt stacks with your own notes.** Add project-specific instructions below the claudex block in `CLAUDE.md` — both will be active.
+**Your existing `CLAUDE.md` is safe** — claudex preserves any content you've written below the role block.
 
 ---
 
 ## Troubleshooting
 
 **`claudex: command not found`**
-
-`npm link` didn't register the binary. Try:
-```powershell
-# Windows — run PowerShell as Administrator
-npm link
-
+```bash
 # macOS / Linux
 sudo npm link
 
-# Or add npm global bin to PATH manually
-# Windows:
-$env:PATH += ";$env:APPDATA\npm"
-# macOS / Linux:
-export PATH="$(npm root -g)/../bin:$PATH"
+# Windows — run PowerShell as Administrator
+npm link
+
+# Or add npm global bin to PATH
+# Windows: $env:PATH += ";$env:APPDATA\npm"
+# macOS:   export PATH="$(npm root -g)/../bin:$PATH"
 ```
 
-**`✗ claude not found in PATH` or `✗ Failed to launch 'claude'`**
+**`✗ Claude Code not found`**
 
-Claude Code is installed but can't be launched. Try:
+claudex will offer to install it automatically. Or manually:
 ```bash
-claude --version        # verify it works directly
-npm install -g @anthropic-ai/claude-code   # reinstall if needed
-claude login            # re-authenticate
+npm install -g @anthropic-ai/claude-code
+claude login
 ```
 
-On Windows, restart PowerShell after installing Claude Code so the PATH updates take effect.
+On Windows, restart PowerShell after installing so PATH updates take effect.
 
-**Model flag not taking effect**
+**`✗ Failed to launch 'claude'`**
 
-Use `=` not a space: `--model=sonnet` not `--model sonnet`. Or use the full ID: `--model=claude-sonnet-4-6`.
+Claude Code is installed but can't be spawned. Try:
+```bash
+claude --version          # verify it works
+npm install -g @anthropic-ai/claude-code   # reinstall
+claude login              # re-authenticate
+```
 
-**Existing `CLAUDE.md` got overwritten**
+**Model flag not working**
 
-claudex only replaces the section between the claudex banner and the `<!-- claudex:role:... -->` marker. Content below the `---` separator is always preserved.
+Use `=` not a space: `--model=sonnet` ✓ not `--model sonnet` ✗
 
 ---
 
-## Updating claudex
-
-Extract the new archive over your existing folder and re-link:
+## Updating
 
 ```bash
-tar -xzf claudex.tar.gz
 cd claudex
+git pull
 npm install
-npm link
 ```
+
+No need to re-run `npm link` after pulling updates.
+
+---
+
+## Contributing
+
+PRs welcome. Ideas for v2.1:
+
+- [ ] Custom roles via config
+- [ ] Cost budget alerts (`--budget=5`)
+- [ ] Export session history to CSV/markdown
+- [ ] `claudex ls` — list all project configs
+- [ ] Neovim / JetBrains integration
+
+---
+
+## License
+
+MIT — free to use, modify, and distribute.
+
+---
+
+<div align="center">
+Built on top of <a href="https://github.com/anthropics/claude-code">Claude Code</a> by Anthropic
+</div>
