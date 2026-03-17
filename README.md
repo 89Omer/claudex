@@ -84,7 +84,7 @@ When you exit, claudex shows a session summary:
 
 ```bash
 # Clone the repo
-git clone https://github.com/yourusername/claudex
+git clone https://github.com/89Omer/claudex
 cd claudex
 
 # Install dependencies
