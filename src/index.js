@@ -274,8 +274,49 @@ function launchClaudeCode(role, model, claudeCmd, template = null, extraArgs = [
   claude.on('close', async (code) => {
     const duration = Date.now() - sessionStart
 
-    // Try to get real token counts from Claude Code's session files
-    // Estimate as fallback (rough: 1 token ≈ 4 chars, assume avg session)
+    // Read real token counts from Claude Code's JSONL session files
+    let inputTokens = 0
+    let outputTokens = 0
+    try {
+      const { readdirSync, readFileSync, statSync } = await import('fs')
+      const { homedir } = await import('os')
+      const { join } = await import('path')
+      const projectsDir = join(homedir(), '.claude', 'projects')
+
+      if (existsSync(projectsDir)) {
+        // Find all JSONL files modified after sessionStart
+        for (const projectDir of readdirSync(projectsDir)) {
+          const projectPath = join(projectsDir, projectDir)
+          try {
+            for (const file of readdirSync(projectPath).filter(f => f.endsWith('.jsonl'))) {
+              const filePath = join(projectPath, file)
+              try {
+                const mtime = statSync(filePath).mtimeMs
+                if (mtime >= sessionStart) {
+                  // Parse token usage from this session file
+                  const lines = readFileSync(filePath, 'utf-8').trim().split('\n')
+                  for (const line of lines) {
+                    try {
+                      const entry = JSON.parse(line)
+                      if (entry.usage) {
+                        inputTokens += entry.usage.input_tokens || 0
+                        outputTokens += entry.usage.output_tokens || 0
+                      }
+                      if (entry.message?.usage) {
+                        inputTokens += entry.message.usage.input_tokens || 0
+                        outputTokens += entry.message.usage.output_tokens || 0
+                      }
+                    } catch {}
+                  }
+                }
+              } catch {}
+            }
+          } catch {}
+        }
+      }
+    } catch {}
+
+    const cost = calcCost(inputTokens, outputTokens, model)
     const session = {
       id: sessionId,
       role: role.id,
@@ -283,9 +324,9 @@ function launchClaudeCode(role, model, claudeCmd, template = null, extraArgs = [
       startTime: sessionStart,
       endTime: Date.now(),
       duration,
-      inputTokens: 0,
-      outputTokens: 0,
-      cost: 0,
+      inputTokens,
+      outputTokens,
+      cost,
       project: cwd,
       template: template?.key || null,
     }
@@ -298,7 +339,7 @@ function launchClaudeCode(role, model, claudeCmd, template = null, extraArgs = [
     printSessionSummary(session)
     process.exit(code || 0)
   })
-
+  
   claude.on('error', (err) => {
     if (err.code === 'ENOENT') {
       console.log(chalk.red(`\n  ✗ Failed to launch '${claudeCmd}'`))
