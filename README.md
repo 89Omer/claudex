@@ -84,7 +84,7 @@ When you exit, claudex shows a session summary:
 
 ```bash
 # Clone the repo
-git clone https://github.com/89Omer/claudex
+git clone https://github.com/yourusername/claudex
 cd claudex
 
 # Install dependencies
@@ -376,6 +376,32 @@ npm install
 ```
 
 No need to re-run `npm link` after pulling updates.
+
+---
+
+## Power Users — Pair with everything-claude-code
+
+claudex handles the **launch layer** — role context, model selection, cost tracking.
+
+For the **inside of your sessions** — skills, hooks, subagents, and slash commands — pair it with [everything-claude-code](https://github.com/affaan-m/everything-claude-code) by [@affaanmustafa](https://github.com/affaan-m).
+
+```
+claudex                          → sets role, model, CLAUDE.md, tracks cost
+     ↓ launches Claude Code
+everything-claude-code plugin    → skills, hooks, subagents, /commands inside sessions
+```
+
+They don't overlap. They stack.
+
+**Install everything-claude-code inside a Claude Code session:**
+
+```bash
+# Run these inside Claude Code after launching with claudex
+/plugin marketplace add affaan-m/everything-claude-code
+/plugin install everything-claude-code@everything-claude-code
+```
+
+You get claudex's role system on top of a battle-tested skill and agent library. The best of both.
 
 ---
 
