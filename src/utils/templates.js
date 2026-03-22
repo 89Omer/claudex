@@ -86,6 +86,37 @@ const BUILTIN_TEMPLATES = {
       label: 'Define Metrics',
       prompt: 'Define KPIs and success metrics for this feature. Include leading and lagging indicators, targets, and measurement methods:\n\n'
     },
+  },
+
+  marketing: {
+    copy: {
+      label: 'Write Copy',
+      prompt: 'Write compelling copy for the following. Include headline, subheadline, body copy, and CTA. Also suggest one A/B variant:\n\n'
+    },
+    campaign: {
+      label: 'Campaign Plan',
+      prompt: 'Plan a full marketing campaign for the following. Include: objective, target audience, channels, key messages, content plan, budget split, and KPIs:\n\n'
+    },
+    brand: {
+      label: 'Brand Positioning',
+      prompt: 'Develop brand positioning and messaging for the following. Include: positioning statement, key value props, target audience, tone of voice, and messaging hierarchy:\n\n'
+    },
+    seo: {
+      label: 'SEO Brief',
+      prompt: 'Create a detailed SEO content brief for the following topic. Include: primary keyword, secondary keywords, search intent, recommended outline, meta title, meta description, and internal linking suggestions:\n\n'
+    },
+    email: {
+      label: 'Email Sequence',
+      prompt: 'Write an email sequence for the following goal. For each email include: subject line, preview text, body copy, and CTA. Suggest optimal send timing:\n\n'
+    },
+    ad: {
+      label: 'Ad Creative',
+      prompt: 'Write ad creative variants for the following. Produce 3 versions with different angles. For each: headline, body copy, CTA, and the psychological trigger being used:\n\n'
+    },
+    content: {
+      label: 'Blog Post',
+      prompt: 'Write a high-quality, SEO-optimised blog post on the following topic. Include a compelling headline, introduction, structured body with subheadings, key takeaways, and a closing CTA:\n\n'
+    },
   }
 }
 
