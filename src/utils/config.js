@@ -62,3 +62,13 @@ export function resolveModel(input) {
   const found = MODELS.find(m => m.id === lower)
   return found ? found.id : null
 }
+
+export const CONTEXT_WINDOWS = {
+  'claude-opus-4-6':   200000,
+  'claude-sonnet-4-6': 200000,
+  'claude-haiku-4-5':  200000,
+}
+
+export function getContextWindow(model) {
+  return CONTEXT_WINDOWS[model] || 200000
+}

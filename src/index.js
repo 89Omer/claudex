@@ -9,14 +9,25 @@ import { join } from 'path'
 import { getConfig, getProjectConfig, MODELS, resolveModel } from './utils/config.js'
 import { getRole, ROLES } from './roles/index.js'
 import { runInit } from './utils/init.js'
-import { saveSession, updateStats, saveProjectMemory, getProjectMemory } from './utils/store.js'
+import { saveSession, updateStats, saveProjectMemory, getProjectMemory, loadSessions } from './utils/store.js'
 import { calcCost, formatCost, formatTokens, formatDuration, getClaudeCodeSessions } from './utils/cost.js'
 import { getTemplates, formatTemplateList } from './utils/templates.js'
-import { printSessionSummary, printHistory, printStats, printResumePicker, printTemplatePicker } from './utils/display.js'
+import { printSessionSummary, printHistory, printStats, printResumePicker, printTemplatePicker, printPreLaunchStats } from './utils/display.js'
+import { launchWatch, runWatcher, writeWatchState } from './utils/watch.js'
+import { printDoctorReport, printContextReport } from './utils/doctor.js'
 
 // ─── CLI Args ─────────────────────────────────────────────────────────────────
 const args = process.argv.slice(2)
 const subcommand = args[0]
+
+// Internal flag: run as live watcher (right pane in tmux)
+if (args.includes('--watch-mode')) {
+  const { runWatcher } = await import('./utils/watch.js')
+  runWatcher()
+  // Keep process alive
+  setInterval(() => {}, 60000)
+  process.stdin.resume()
+}
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 const globalConfig = getConfig()
@@ -98,7 +109,6 @@ function printBanner() {
 }
 
 function printHelp() {
-  printBanner()
   console.log(chalk.white('  Usage:\n'))
   console.log(chalk.gray('    claudex                          Interactive launcher'))
   console.log(chalk.gray('    claudex --role=<role>            Skip role picker'))
@@ -106,6 +116,9 @@ function printHelp() {
   console.log(chalk.gray('    claudex --role=design --model=opus'))
   console.log()
   console.log(chalk.white('  Commands:\n'))
+  console.log(chalk.gray('    claudex doctor      Check setup, config, and Claude Code availability'))
+  console.log(chalk.gray('    claudex context     Explain the active role/model/context for this project'))
+  console.log(chalk.gray('    claudex watch       Launch with live stats in split terminal (requires tmux)'))
   console.log(chalk.gray('    claudex init        Setup wizard'))
   console.log(chalk.gray('    claudex models      List available models'))
   console.log(chalk.gray('    claudex history     View past sessions'))
@@ -113,7 +126,7 @@ function printHelp() {
   console.log(chalk.gray('    claudex resume      Resume a past Claude Code session'))
   console.log(chalk.gray('    claudex use         Pick a prompt template then launch'))
   console.log()
-  console.log(chalk.white('  Roles:   ') + chalk.gray('dev  design  pm'))
+  console.log(chalk.white('  Roles:   ') + chalk.gray(Object.keys(ROLES).join('  ')))
   console.log(chalk.white('  Models:  ') + chalk.gray('opus  sonnet  haiku'))
   console.log()
 }
@@ -165,6 +178,28 @@ function injectRole(role, model, template = null, cwd) {
 
 function makeAsker(rl) {
   return (q) => new Promise(resolve => rl.question(q, resolve))
+}
+
+function shouldShowFirstRunGuide(cwd) {
+  const projectMemory = getProjectMemory(cwd)
+  const hasProjectConfig = Object.keys(projectConfig || {}).length > 0
+  const hasTrackedSessions = loadSessions().length > 0
+  return !projectMemory && !hasProjectConfig && !hasTrackedSessions
+}
+
+function printFirstRunGuide() {
+  console.log(chalk.gray('  First run guide'))
+  console.log(chalk.gray('  ' + '-'.repeat(Math.max((process.stdout.columns || 80) - 2, 20))))
+  console.log(chalk.gray('  claudex does three things before Claude Code starts:'))
+  console.log(chalk.gray('    1. Picks a role and model for this project'))
+  console.log(chalk.gray('    2. Writes that context into CLAUDE.md'))
+  console.log(chalk.gray('    3. Remembers your last setup for next time'))
+  console.log()
+  console.log(chalk.gray('  Helpful commands after this launch:'))
+  console.log(chalk.gray('    claudex context   See exactly which context sources are active'))
+  console.log(chalk.gray('    claudex doctor    Check setup, config, and Claude Code detection'))
+  console.log(chalk.gray('    claudex use       Start with a built-in template'))
+  console.log()
 }
 
 // ─── Pickers ──────────────────────────────────────────────────────────────────
@@ -253,6 +288,12 @@ function launchClaudeCode(role, model, claudeCmd, template = null, extraArgs = [
 
   injectRole(role, model, template, cwd)
 
+  // Show pre-launch stats
+  printPreLaunchStats(role, model, cwd)
+
+  // Write initial watch state
+  writeWatchState({ role: role.id, model, sessionCost: 0, inputTokens: 0, outputTokens: 0, sessionStart: Date.now() })
+
   // Save project memory
   saveProjectMemory(cwd, { lastRole: role.id, lastModel: model })
 
@@ -274,49 +315,8 @@ function launchClaudeCode(role, model, claudeCmd, template = null, extraArgs = [
   claude.on('close', async (code) => {
     const duration = Date.now() - sessionStart
 
-    // Read real token counts from Claude Code's JSONL session files
-    let inputTokens = 0
-    let outputTokens = 0
-    try {
-      const { readdirSync, readFileSync, statSync } = await import('fs')
-      const { homedir } = await import('os')
-      const { join } = await import('path')
-      const projectsDir = join(homedir(), '.claude', 'projects')
-
-      if (existsSync(projectsDir)) {
-        // Find all JSONL files modified after sessionStart
-        for (const projectDir of readdirSync(projectsDir)) {
-          const projectPath = join(projectsDir, projectDir)
-          try {
-            for (const file of readdirSync(projectPath).filter(f => f.endsWith('.jsonl'))) {
-              const filePath = join(projectPath, file)
-              try {
-                const mtime = statSync(filePath).mtimeMs
-                if (mtime >= sessionStart) {
-                  // Parse token usage from this session file
-                  const lines = readFileSync(filePath, 'utf-8').trim().split('\n')
-                  for (const line of lines) {
-                    try {
-                      const entry = JSON.parse(line)
-                      if (entry.usage) {
-                        inputTokens += entry.usage.input_tokens || 0
-                        outputTokens += entry.usage.output_tokens || 0
-                      }
-                      if (entry.message?.usage) {
-                        inputTokens += entry.message.usage.input_tokens || 0
-                        outputTokens += entry.message.usage.output_tokens || 0
-                      }
-                    } catch {}
-                  }
-                }
-              } catch {}
-            }
-          } catch {}
-        }
-      }
-    } catch {}
-
-    const cost = calcCost(inputTokens, outputTokens, model)
+    // Try to get real token counts from Claude Code's session files
+    // Estimate as fallback (rough: 1 token ≈ 4 chars, assume avg session)
     const session = {
       id: sessionId,
       role: role.id,
@@ -324,9 +324,9 @@ function launchClaudeCode(role, model, claudeCmd, template = null, extraArgs = [
       startTime: sessionStart,
       endTime: Date.now(),
       duration,
-      inputTokens,
-      outputTokens,
-      cost,
+      inputTokens: 0,
+      outputTokens: 0,
+      cost: 0,
       project: cwd,
       template: template?.key || null,
     }
@@ -339,7 +339,7 @@ function launchClaudeCode(role, model, claudeCmd, template = null, extraArgs = [
     printSessionSummary(session)
     process.exit(code || 0)
   })
-  
+
   claude.on('error', (err) => {
     if (err.code === 'ENOENT') {
       console.log(chalk.red(`\n  ✗ Failed to launch '${claudeCmd}'`))
@@ -359,8 +359,17 @@ async function handleSubcommand(cmd) {
       await runInit()
       process.exit(0)
 
+    case 'doctor':
+      printDoctorReport(process.cwd())
+      process.exit(0)
+
+    case 'context':
+      printContextReport(process.cwd())
+      process.exit(0)
+
     case '--help':
     case '-h':
+      printBanner()
       printHelp()
       process.exit(0)
 
@@ -414,6 +423,22 @@ async function handleSubcommand(cmd) {
       break
     }
 
+    case 'watch': {
+      printBanner()
+      const claudeCmd = await ensureClaudeCode()
+      const role = await pickRole(args.find(a => a.startsWith('--role='))?.split('=')[1])
+      console.log()
+      const model = await pickModel(args.find(a => a.startsWith('--model='))?.split('=')[1])
+      console.log()
+      printPreLaunchStats(role, model, process.cwd())
+      const launched = await launchWatch(role, model, claudeCmd, [])
+      if (!launched) {
+        // tmux not available — fall through to normal launch
+        launchClaudeCode(role, model, claudeCmd, null, [])
+      }
+      break
+    }
+
     case 'use': {
       printBanner()
       const claudeCmd = await ensureClaudeCode()
@@ -434,19 +459,25 @@ async function handleSubcommand(cmd) {
 }
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
-printBanner()
-
 // Handle subcommands
-if (subcommand && !subcommand.startsWith('--')) {
+if (subcommand === '--help' || subcommand === '-h') {
+  await handleSubcommand(subcommand)
+} else if (subcommand && !subcommand.startsWith('--')) {
   const handled = await handleSubcommand(subcommand)
   if (!handled) {
+    printBanner()
     console.log(chalk.red(`  Unknown command: ${subcommand}\n`))
     printHelp()
     process.exit(1)
   }
 } else {
   // Interactive launcher
+  printBanner()
   const claudeCmd = await ensureClaudeCode()
+  const cwd = process.cwd()
+  if (shouldShowFirstRunGuide(cwd)) {
+    printFirstRunGuide()
+  }
 
   const roleFlag  = args.find(a => a.startsWith('--role='))
   const modelFlag = args.find(a => a.startsWith('--model='))

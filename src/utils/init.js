@@ -12,6 +12,7 @@ export async function runInit() {
 
   console.log(chalk.cyan.bold('\n  claudex init\n'))
   console.log(chalk.gray('  Setting up your claudex configuration...\n'))
+  console.log(chalk.gray('  These are your defaults. Project memory and CLAUDE.md can still override them later.\n'))
   console.log(chalk.gray('  ' + '─'.repeat(60) + '\n'))
 
   // ── Default role ──────────────────────────────────────────────
@@ -74,5 +75,9 @@ export async function runInit() {
   console.log(chalk.gray(`  Role:    ${role.emoji} ${role.name}`))
   console.log(chalk.gray(`  Model:   ${model.label} (${model.id})`))
   console.log(chalk.gray(`  Budget:  $${budgetAlert}/session alert`))
+  console.log(chalk.gray('\n  Useful next steps:'))
+  console.log(chalk.gray('    claudex           Launch with your defaults'))
+  console.log(chalk.gray('    claudex context   Inspect the active role/model and where they come from'))
+  console.log(chalk.gray('    claudex doctor    Validate setup and Claude Code detection'))
   console.log(chalk.cyan('\n  Run claudex to start\n'))
 }
