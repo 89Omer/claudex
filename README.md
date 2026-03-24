@@ -28,13 +28,14 @@ Claude Code is powerful — but it starts every session as a blank slate with no
 
 **claudex fixes that.** It wraps Claude Code with:
 
-- 🎭 **Role system** — Developer, Designer, or PM mode with tailored system prompts
+- 🎭 **Role system** — Developer, Designer, PM, or Marketing mode with tailored system prompts
 - 🤖 **Model picker** — Choose Opus 4.6, Sonnet 4.6, or Haiku 4.5 at launch
 - 💰 **Cost tracking** — See exactly what each session costs in USD
 - 📊 **Stats dashboard** — Total spend, usage by role and model
 - 📋 **Session history** — Every session logged, resumable
 - ⚡ **Prompt templates** — Fire pre-built prompts for reviews, PRDs, refactors, and more
 - 🧠 **Project memory** — Remembers your last role and model per project
+- 🩺 **Diagnostics** — Inspect active context and validate your local setup with `doctor` and `context`
 
 You run `claudex`. It sets up context and launches Claude Code for you.
 
@@ -109,12 +110,18 @@ claudex --help
 # 1. Run setup wizard (once)
 claudex init
 
-# 2. Go to your project
+# 2. Optional: inspect setup and active context
+claudex doctor
+claudex context
+
+# 3. Go to your project
 cd my-project
 
-# 3. Launch
+# 4. Launch
 claudex
 ```
+
+On a first run in a new project, claudex now prints a short guide explaining what it will do before Claude Code starts: pick a role/model, write context into `CLAUDE.md`, and save project memory for next time.
 
 You'll see role and model pickers. Press Enter to accept defaults, or type a number:
 
@@ -143,6 +150,9 @@ You'll see role and model pickers. Press Enter to accept defaults, or type a num
 | Command | Description |
 |---|---|
 | `claudex` | Interactive launcher — pick role + model |
+| `claudex doctor` | Check setup, config, supported models, and Claude Code availability |
+| `claudex context` | Show the active role/model for this project and where they came from |
+| `claudex watch` | Launch with a live stats side panel in `tmux` |
 | `claudex init` | First-time setup wizard |
 | `claudex models` | List all available models |
 | `claudex history` | Table of past sessions with cost + duration |
@@ -184,6 +194,13 @@ Covers: user stories, PRDs, RICE/MoSCoW prioritization, roadmaps, KPIs, stakehol
 
 Best for: PRDs, user stories, feature briefs, prioritization, retros.
 
+### 📣 Marketing (`--role=marketing`)
+Focused on messaging, growth, and launch execution.
+
+Covers: copywriting, positioning, campaigns, SEO briefs, email sequences, ad creative, and content strategy.
+
+Best for: landing page copy, campaign plans, brand messaging, blog outlines, and marketing assets.
+
 ---
 
 ## Models
@@ -209,6 +226,8 @@ Run `claudex use` to pick a template before launching. Templates inject a pre-bu
 **Designer templates:** UX Review, Build Component, Make Responsive, Accessibility Audit, Add Animation, Design Tokens
 
 **PM templates:** User Story, Write PRD, Prioritize (RICE), Project Brief, Retro, Define Metrics
+
+**Marketing templates:** Write Copy, Campaign Plan, Brand Positioning, SEO Brief, Email Sequence, Ad Creative, Blog Post
 
 Add your own in `.claudex.json`:
 ```json
@@ -281,6 +300,26 @@ claudex remembers your last role and model **per project folder**. Next time you
 
 Override anytime by picking a different option.
 
+## Diagnostics & Context
+
+Use these commands when you want the user to understand exactly what claudex is doing:
+
+```bash
+claudex doctor
+claudex context
+```
+
+`claudex doctor` checks:
+- whether Claude Code is installed and discoverable
+- whether your saved config references supported roles/models
+- whether this project has `.claudex.json`, `CLAUDE.md`, and saved project memory
+- how many sessions and how much spend claudex has tracked
+
+`claudex context` explains:
+- the active role and model for the current project
+- whether they came from `CLAUDE.md`, project memory, `.claudex.json`, or global defaults
+- what prompt layers are available, including templates and any extra user content in `CLAUDE.md`
+
 ---
 
 ## Project Config
@@ -303,6 +342,27 @@ Create `.claudex.json` in any project to set per-project defaults:
 ```
 
 Commit it to share defaults with your team, or add to `.gitignore` to keep it personal.
+
+## Testing
+
+This repo does not include a formal automated test suite yet. The fastest smoke test is:
+
+```bash
+node src/index.js --help
+node src/index.js doctor
+node src/index.js context
+node --check src/index.js
+node --check src/utils/doctor.js
+node --check src/utils/init.js
+```
+
+For manual verification of the interactive flow:
+
+```bash
+node src/index.js
+node src/index.js use
+node src/index.js watch
+```
 
 ---
 
