@@ -33,6 +33,7 @@ Claude Code is powerful — but it starts every session as a blank slate with no
 - 💰 **Cost tracking** — See exactly what each session costs in USD
 - 📊 **Stats dashboard** — Total spend, usage by role and model
 - 📋 **Session history** — Every session logged, resumable
+- 📝 **Session notes** — Save notes after each session, auto-suggested in future sessions
 - ⚡ **Prompt templates** — Fire pre-built prompts for reviews, PRDs, refactors, and more
 - 🧠 **Project memory** — Remembers your last role and model per project
 - 🩺 **Diagnostics** — Inspect active context and validate your local setup with `doctor` and `context`
@@ -52,7 +53,7 @@ claudex
   └── Claude Code launches with your context active from message one
 ```
 
-When you exit, claudex shows a session summary:
+When you exit, claudex shows a session summary and optionally saves notes:
 
 ```
   ────────────────────────────────────────────
@@ -69,7 +70,14 @@ When you exit, claudex shows a session summary:
   All-time  $2.34 across 28 sessions
 
   ────────────────────────────────────────────
+
+  Save session notes for next time? (Ctrl+D to finish, or press Enter to skip)
+  > Fixed the auth middleware, added tests, need to review in next session
+
+  ✓ Notes saved
 ```
+
+Your notes are stored and automatically suggested when you resume related sessions.
 
 ---
 
@@ -291,6 +299,25 @@ claudex resume       # pick a past session to continue
 ```
 
 Resume opens a picker showing your recent Claude Code sessions. Select one to pick up exactly where you left off.
+
+---
+
+## Session Notes
+
+After each session ends, claudex offers a quick prompt to save notes:
+
+```
+Save session notes for next time? (Ctrl+D to finish, or press Enter to skip)
+>
+```
+
+Type what you did, blockers, next steps, or anything you want to remember. Press Ctrl+D to save, or Enter to skip.
+
+**Your notes are automatically suggested in future sessions**, helping you jump back in without re-reading context. Great for:
+- Tracking blockers to tackle next
+- Documenting what was completed
+- Leaving yourself breadcrumbs for multi-day tasks
+- Building continuity across sessions
 
 ---
 
