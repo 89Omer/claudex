@@ -5,6 +5,7 @@ import { ROLES } from '../roles/index.js'
 import { MODELS, PRICING, getContextWindow } from './config.js'
 
 const cols = () => Math.min(process.stdout.columns || 80, 100)
+let frameCount = 0
 
 function divider(char = '─', c = 'gray') {
   return chalk[c](char.repeat(cols()))
@@ -303,88 +304,176 @@ export function printTemplatePicker(templates, role) {
 // ─── Live Watch HUD (for claudex watch) ───────────────────────────────────────
 
 export function renderWatchHUD(state) {
-  const { role, model, sessionCost, totalCost, inputTokens, outputTokens, duration, sessionStart, budget, lastActivity } = state
-  const r = ROLES[role] || { emoji: '?', name: role, colorName: 'white' }
-  const m = MODELS.find(x => x.id === model)
-  const contextMax = getContextWindow(model)
-  const totalTok = (inputTokens || 0) + (outputTokens || 0)
-  const ctxPct = Math.min((totalTok / contextMax) * 100, 100)
-  const ctxColor = ctxPct > 85 ? 'red' : ctxPct > 65 ? 'yellow' : 'cyan'
-  const elapsedMs = Date.now() - (sessionStart || Date.now())
-  const elapsedMins = elapsedMs / 60000
-  const burnRate = elapsedMins > 0.1 ? (sessionCost || 0) / elapsedMins : 0
-  const budgetPct = budget > 0 ? Math.min(((sessionCost || 0) / budget) * 100, 100) : 0
-  const budgetColor = budgetPct > 90 ? 'red' : budgetPct > 70 ? 'yellow' : 'green'
-  const costColor = (sessionCost || 0) > 1 ? 'red' : (sessionCost || 0) > 0.5 ? 'yellow' : 'green'
+  frameCount += 1
 
-  const fmtEl = ms => {
-    const s = Math.floor(ms / 1000), mi = Math.floor(s / 60), h = Math.floor(mi / 60)
-    return h > 0 ? `${h}h ${mi % 60}m` : mi > 0 ? `${mi}m ${s % 60}s` : `${s}s`
+  const {
+    role,
+    model,
+    sessionCost = 0,
+    totalCost = 0,
+    inputTokens = 0,
+    outputTokens = 0,
+    duration,
+    sessionStart,
+    budget = 0,
+    lastActivity
+  } = state
+
+  const roleInfo = ROLES[role] || { emoji: '?', name: role || 'Unknown', colorName: 'white' }
+  const modelInfo = MODELS.find(x => x.id === model) || { id: model, label: model || 'Unknown model' }
+  const pricing = PRICING[model] || PRICING['claude-sonnet-4-6'] || { input: 0, output: 0 }
+  const contextMax = getContextWindow(model)
+  const totalTokens = inputTokens + outputTokens
+  const elapsedMs = duration || (Date.now() - (sessionStart || Date.now()))
+  const elapsedSecs = Math.max(elapsedMs / 1000, 1)
+  const elapsedMins = Math.max(elapsedMs / 60000, 1 / 60)
+  const ctxPct = contextMax > 0 ? Math.min((totalTokens / contextMax) * 100, 100) : 0
+  const tokenBurnRate = totalTokens > 0 ? totalTokens / elapsedSecs : 0
+  const costBurnRate = sessionCost > 0 ? sessionCost / elapsedMins : 0
+  const budgetPct = budget > 0 ? Math.min((sessionCost / budget) * 100, 100) : 0
+  const budgetRemaining = Math.max(budget - sessionCost, 0)
+  const isStreaming = !lastActivity || ((Date.now() - lastActivity) / 1000) < 8
+  const pulsingDot = frameCount % 2 === 0 ? chalk.cyanBright('●') : chalk.cyan.dim('●')
+  const width = Math.max(Math.min(process.stdout.columns || 80, 110), 72)
+  const innerWidth = width - 2
+  const contextBarWidth = Math.max(Math.min(innerWidth - 18, 36), 20)
+
+  const fmtNumber = n => Number(n || 0).toLocaleString('en-US')
+  const fmtCompact = n => {
+    const value = Number(n || 0)
+    if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`
+    if (value >= 1_000) return `${(value / 1_000).toFixed(1)}k`
+    return fmtNumber(Math.round(value))
+  }
+  const fmtMoney = n => `$${Number(n || 0).toFixed(4)}`
+  const fmtElapsed = ms => {
+    const totalSeconds = Math.max(Math.floor(ms / 1000), 0)
+    const mins = Math.floor(totalSeconds / 60)
+    const secs = totalSeconds % 60
+    const hours = Math.floor(mins / 60)
+    if (hours > 0) return `${hours}h ${mins % 60}m`
+    return `${mins}m ${secs}s`
+  }
+  const visible = text => String(text).replace(/\u001b\[[0-9;]*m/g, '').length
+  const padRight = (text, widthValue) => text + ' '.repeat(Math.max(widthValue - visible(text), 0))
+  const padBetween = (left, right, widthValue) => {
+    const spaces = Math.max(widthValue - visible(left) - visible(right), 1)
+    return left + ' '.repeat(spaces) + right
+  }
+  const line = text => `║${padRight(`  ${text}`, innerWidth)}║`
+  const split = (left, right) => `║${padBetween(`  ${left}`, right, innerWidth)}║`
+  const sectionDivider = char => `╠${char.repeat(innerWidth)}╣`
+
+  const contextFilled = Math.round((ctxPct / 100) * contextBarWidth)
+  let contextBar = ''
+  for (let i = 0; i < contextBarWidth; i++) {
+    const block = i < contextFilled ? '█' : '░'
+    const fillPct = ((i + 1) / contextBarWidth) * 100
+    if (i >= contextFilled) {
+      contextBar += chalk.gray(block)
+    } else if (fillPct <= 50) {
+      contextBar += chalk.green(block)
+    } else if (fillPct <= 75) {
+      contextBar += chalk.yellow(block)
+    } else if (fillPct <= 90) {
+      contextBar += chalk.hex('#ff8c00')(block)
+    } else {
+      contextBar += chalk.redBright(block)
+    }
   }
 
-  // Clear screen and redraw
+  const costColor = sessionCost > 1 ? 'red' : sessionCost >= 0.5 ? 'yellow' : 'green'
+  const budgetColor = budgetPct >= 90 ? 'redBright' : budgetPct >= 70 ? 'yellow' : 'green'
+  const budgetSegments = 20
+  const budgetFilled = budget > 0 ? Math.round((budgetPct / 100) * budgetSegments) : 0
+  const budgetBar = Array.from({ length: budgetSegments }, (_, i) => {
+    const block = i < budgetFilled ? '■' : '□'
+    if (i >= budgetFilled) return chalk.gray(block)
+    if (budgetPct >= 90) return frameCount % 2 === 0 ? chalk.redBright(block) : chalk.red(block)
+    if (budgetPct >= 70) return chalk.yellow(block)
+    return chalk.green(block)
+  }).join('')
+
+  const sparklineLevels = ['▁', '▂', '▃', '▄', '▅', '▆', '▇', '█']
+  const sparkIndex = Math.min(
+    Math.round(Math.min(tokenBurnRate / 60, 1) * (sparklineLevels.length - 1)),
+    sparklineLevels.length - 1
+  )
+  const sparkline = Array.from({ length: 8 }, (_, i) => {
+    const index = Math.max(0, sparkIndex - Math.max(0, 4 - i))
+    return sparklineLevels[Math.min(index, sparklineLevels.length - 1)]
+  }).join('')
+
+  const tips = [
+    { threshold: 0, icon: '💡', msg: 'Tip: Haiku is 6x cheaper for simple tasks' },
+    { threshold: 0.15, icon: '✂️', msg: 'Tip: Clear context after switching topics' },
+    { threshold: 0.30, icon: '🎯', msg: 'Tip: Specific prompts = shorter answers = lower cost' },
+    { threshold: 0.60, icon: '📦', msg: 'Tip: Break large tasks into smaller messages' },
+    { threshold: 1.20, icon: '⚡', msg: 'Tip: Switch to Haiku for brainstorming' },
+  ]
+  const tipPool = tips.filter(tip => sessionCost >= tip.threshold)
+  const rotatedTips = tipPool.length > 0 ? tipPool : [tips[0]]
+  const activeTip = rotatedTips[Math.floor(frameCount / 10) % rotatedTips.length]
+  const contextWarning = ctxPct >= 80 ? `${chalk.redBright('⚠')} ${chalk.yellow('Consider clearing context soon')}` : null
+  const budgetWarning = budget > 0 && budgetPct >= 90
+    ? (frameCount % 2 === 0 ? chalk.redBright('🚨 BUDGET WARNING') : chalk.red('🚨 BUDGET WARNING'))
+    : null
+  const burnLine = isStreaming && tokenBurnRate > 0.2
+    ? `${chalk.yellow('🔥')} ${chalk.yellow.bold(`${fmtNumber(Math.round(tokenBurnRate))} tok/s`)} ${chalk.gray(sparkline)}`
+    : `${chalk.gray('…')} ${chalk.gray('Waiting for token updates')}`
+
   process.stdout.write('\x1b[2J\x1b[H')
 
-  const w = Math.min(process.stdout.columns || 40, 42)
-  const line = '─'.repeat(w)
-
-  console.log(chalk.cyan.bold('  claudex') + chalk.gray(' watch'))
-  console.log(chalk.gray(line))
-  console.log()
-
-  // Role + model
-  console.log(`  ${chalk[r.colorName].bold(`${r.emoji} ${r.name}`)}`)
-  console.log(`  ${chalk.gray(modelLabel(model))}  ${chalk.gray(`$${m?.inputCost ?? '?'}/$${m?.outputCost ?? '?'}/1M`)}`)
-  console.log()
-
-  // Token counter
-  console.log(chalk.gray('  TOKENS'))
-  console.log(`  ${chalk.white.bold(formatTokens(totalTok))} ${chalk.gray('total')}`)
-  console.log(`  ${chalk.gray(formatTokens(inputTokens || 0))} in  ${chalk.gray('/')}  ${chalk.cyan(formatTokens(outputTokens || 0))} out`)
-  console.log()
-
-  // Context bar
-  console.log(chalk.gray('  CONTEXT WINDOW'))
-  console.log(`  ${chalk[ctxColor](makeBar(totalTok, contextMax, 20))}`)
-  console.log(`  ${chalk[ctxColor](`${ctxPct.toFixed(1)}%`)} ${chalk.gray(`of ${formatTokens(contextMax)}`)}`)
-  console.log()
-
-  // Cost
-  console.log(chalk.gray('  SESSION COST'))
-  console.log(`  ${chalk[costColor].bold(formatCost(sessionCost || 0))}`)
-  console.log(`  ${chalk.gray(formatCost(totalCost || 0))} ${chalk.gray('all-time')}`)
-  if (burnRate > 0) {
-    console.log(`  ${chalk.gray(formatCost(burnRate) + '/min')}`)
-  }
-  console.log()
-
-  // Duration
-  console.log(chalk.gray('  DURATION'))
-  console.log(`  ${chalk.white(fmtEl(elapsedMs))}`)
-  console.log()
-
-  // Budget
-  if (budget > 0) {
-    console.log(chalk.gray('  BUDGET'))
-    console.log(`  ${chalk[budgetColor](makeBar(sessionCost || 0, budget, 20))}`)
-    console.log(`  ${chalk[budgetColor](`${budgetPct.toFixed(1)}%`)} ${chalk.gray(`of ${formatCost(budget)} limit`)}`)
-    console.log()
-  }
-
-  // Savings tip
-  const TIPS = [
-    { t: 0.05, msg: 'Use Haiku for quick Q&A — 6x cheaper' },
-    { t: 0.20, msg: 'Clear chat after topics change' },
-    { t: 0.50, msg: 'Be specific — vague = longer = costlier' },
-    { t: 1.00, msg: 'Break large tasks into smaller messages' },
+  const output = [
+    `╔${'═'.repeat(innerWidth)}╗`,
+    split(
+      `${pulsingDot} ${chalk.cyanBright.bold('claudex watch')}  ${chalk[roleInfo.colorName].bold(`${roleInfo.emoji} ${roleInfo.name}`)}`,
+      chalk.white.bold(fmtElapsed(elapsedMs))
+    ),
+    split(
+      `${chalk.gray('Model')} ${chalk.white(modelInfo.label)} ${chalk.gray('·')} ${chalk.gray(`$${pricing.input}/$${pricing.output} per 1M`)}`,
+      chalk.gray(isStreaming ? 'live' : 'idle')
+    ),
+    sectionDivider('═'),
+    line(chalk.gray.bold('TOKENS')),
+    line(`${chalk.white.bold(`${fmtNumber(totalTokens)} total`)} ${chalk.gray(`(${fmtCompact(totalTokens)})`)}`),
+    split(
+      `${chalk.blue('↑')} ${chalk.blueBright(fmtNumber(inputTokens))} ${chalk.gray('input')}`,
+      `${chalk.green('↓')} ${chalk.greenBright(fmtNumber(outputTokens))} ${chalk.gray('output')}`
+    ),
+    line(burnLine),
+    sectionDivider('─'),
+    split(
+      `${chalk.gray.bold('CONTEXT')}  ${ctxPct >= 90 ? chalk.redBright('⚠ ') : ''}${chalk.white.bold(`${ctxPct.toFixed(1)}%`)}`,
+      chalk.gray(`${fmtCompact(totalTokens)} / ${fmtCompact(contextMax)}`)
+    ),
+    split(contextBar, chalk[ctxPct >= 90 ? 'redBright' : ctxPct >= 75 ? 'yellow' : 'green'](`${ctxPct.toFixed(1)}%`)),
+    ...(contextWarning ? [line(contextWarning)] : []),
+    sectionDivider('─'),
+    split(
+      `${chalk.gray.bold('COST')}  ${chalk[costColor].bold(fmtMoney(sessionCost))}`,
+      `${chalk.gray('$/min')} ${chalk[costColor](fmtMoney(costBurnRate))}`
+    ),
+    line(chalk.gray(`${fmtMoney(totalCost)} all-time`)),
+    ...(budget > 0 ? [
+      sectionDivider('─'),
+      split(
+        `${chalk.gray.bold('🪙 BUDGET')}  ${chalk[budgetColor].bold(`${budgetPct.toFixed(1)}% used`)}`,
+        chalk.gray(`${fmtMoney(budgetRemaining)} remaining`)
+      ),
+      line(`${budgetBar} ${chalk.gray(`· ${fmtMoney(sessionCost)} / ${fmtMoney(budget)}`)}`),
+      ...(budgetWarning ? [line(budgetWarning)] : []),
+    ] : []),
+    sectionDivider('─'),
+    line(`${activeTip.icon} ${chalk.white(activeTip.msg)}`),
+    sectionDivider('─'),
+    split(
+      chalk.gray(`Updated ${new Date().toLocaleTimeString('en-GB', { hour12: false })}`),
+      chalk.gray('Ctrl+C to exit')
+    ),
+    `╚${'═'.repeat(innerWidth)}╝`,
   ]
-  const tip = [...TIPS].reverse().find(x => (sessionCost || 0) >= x.t)
-  if (tip) {
-    console.log(chalk.gray('  TIP'))
-    console.log(`  ${chalk.yellow('💡')} ${chalk.gray(tip.msg)}`)
-    console.log()
-  }
 
-  console.log(chalk.gray(line))
-  console.log(chalk.gray(`  Updated ${new Date().toLocaleTimeString()}`))
+  process.stdout.write(output.join('\n') + '\n')
 }
+

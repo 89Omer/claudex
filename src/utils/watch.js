@@ -113,7 +113,7 @@ export function runWatcher() {
 
 // ─── Launch claudex watch (tmux split) ────────────────────────────────────────
 
-export async function launchWatch(role, model, claudeCmd, extraArgs = []) {
+export async function launchWatch(role, model, claudeCmd, extraArgs = [], priorContext = null) {
   // Check if tmux is available
   const hasTmux = (() => {
     try { execSync('tmux -V', { stdio: 'ignore' }); return true } catch { return false }

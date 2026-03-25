@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find /d/projects_core/claude-claudex/claudex -name .claudex* -o -name CLAUDE.md)",
+      "Bash(grep -E \"\\\\.\\(js|json\\)$\")",
+      "Bash(node --check src/index.js)",
+      "Bash(node --check src/utils/recommendation.js)",
+      "Bash(node --check src/utils/store.js)",
+      "Bash(node --check src/utils/continuity.js)",
+      "Bash(node --check src/utils/watch.js)"
+    ]
+  }
+}

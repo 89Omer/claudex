@@ -9,7 +9,9 @@ import { join } from 'path'
 import { getConfig, getProjectConfig, MODELS, resolveModel } from './utils/config.js'
 import { getRole, ROLES } from './roles/index.js'
 import { runInit } from './utils/init.js'
-import { saveSession, updateStats, saveProjectMemory, getProjectMemory, loadSessions } from './utils/store.js'
+import { saveSession, updateStats, saveProjectMemory, getProjectMemory, loadSessions, saveSessionNotes } from './utils/store.js'
+import { getRecommendationHint } from './utils/recommendation.js'
+import { detectRelatedSessions, buildContextInjection } from './utils/continuity.js'
 import { calcCost, formatCost, formatTokens, formatDuration, getClaudeCodeSessions } from './utils/cost.js'
 import { getTemplates, formatTemplateList } from './utils/templates.js'
 import { printSessionSummary, printHistory, printStats, printResumePicker, printTemplatePicker, printPreLaunchStats } from './utils/display.js'
@@ -143,20 +145,21 @@ function printModels() {
   console.log(chalk.gray('  Usage:  claudex --model=sonnet\n'))
 }
 
-function buildClaudeMd(role, model, template = null, userContent = '') {
+function buildClaudeMd(role, model, template = null, userContent = '', priorContext = null) {
   const modelInfo = MODELS.find(m => m.id === model) || { label: model }
   const templateBlock = template ? `\n\n## Active Template: ${template.label}\n${template.prompt}` : ''
+  const contextBlock = priorContext ? `\n\n${priorContext}\n\n---` : ''
   const separator = userContent ? `\n\n---\n\n${userContent}` : ''
   return `# claudex — Active Role: ${role.name} ${role.emoji}
 # Model: ${modelInfo.label} (${model})
 
-${role.systemPrompt}${templateBlock}
+${role.systemPrompt}${templateBlock}${contextBlock}
 <!-- claudex:role:${role.id} -->
 <!-- claudex:model:${model} -->${separator}
 `.trim() + '\n'
 }
 
-function injectRole(role, model, template = null, cwd) {
+function injectRole(role, model, template = null, cwd, priorContext = null) {
   const claudeMdPath = join(cwd, 'CLAUDE.md')
   let userContent = ''
   if (existsSync(claudeMdPath)) {
@@ -167,17 +170,67 @@ function injectRole(role, model, template = null, cwd) {
         userContent = parts.slice(1).join('\n---\n')
           .replace(/<!-- claudex:role:\w+ -->/, '')
           .replace(/<!-- claudex:model:[^>]+ -->/, '')
+          .replace(/<!-- claudex:context:auto-injected -->/, '')
           .trim()
       }
     } else {
       userContent = existing.trim()
     }
   }
-  writeFileSync(claudeMdPath, buildClaudeMd(role, model, template, userContent))
+  writeFileSync(claudeMdPath, buildClaudeMd(role, model, template, userContent, priorContext))
 }
 
 function makeAsker(rl) {
   return (q) => new Promise(resolve => rl.question(q, resolve))
+}
+
+// ─── Session Notes & Context Helpers ───────────────────────────────────────────
+
+async function askYesNo(question, defaultAnswer = true) {
+  const rl = readline.createInterface({ input: process.stdin, output: process.stdout })
+  const answer = await new Promise(resolve => rl.question(question, resolve))
+  rl.close()
+  const response = answer.trim().toLowerCase()
+  if (response === 'y') return true
+  if (response === 'n') return false
+  return defaultAnswer
+}
+
+async function promptSessionNotesAsync(sessionId) {
+  // Non-blocking: shows prompt with 5s timeout
+  // If user provides input: save notes
+  // If timeout: silently exit
+  if (!process.stdin.isTTY) return null // Skip in non-interactive mode
+
+  try {
+    return await Promise.race([
+      getUserInputForNotes(),
+      new Promise((_, reject) => setTimeout(() => reject('timeout'), 5000))
+    ])
+  } catch (err) {
+    // Timeout or error — just return null
+    return null
+  }
+}
+
+async function getUserInputForNotes() {
+  return new Promise(resolve => {
+    const rl = readline.createInterface({ input: process.stdin, output: process.stdout })
+    console.log(chalk.blue('  Save session notes for next time? (Ctrl+D to finish, or press Enter to skip)'))
+    let notes = ''
+
+    rl.on('line', line => {
+      notes += (notes ? '\n' : '') + line
+    })
+
+    rl.on('close', () => {
+      if (notes.trim()) {
+        resolve(notes.trim())
+      } else {
+        resolve(null)
+      }
+    })
+  })
 }
 
 function shouldShowFirstRunGuide(cwd) {
@@ -229,7 +282,7 @@ async function pickRole(preselected) {
   return (!isNaN(idx) && roleList[idx]) ? roleList[idx] : getRole(defaultRoleId)
 }
 
-async function pickModel(preselected) {
+async function pickModel(preselected, roleId = null) {
   if (preselected) return resolveModel(preselected) || config.defaultModel || 'claude-sonnet-4-6'
 
   const cwd = process.cwd()
@@ -238,6 +291,15 @@ async function pickModel(preselected) {
 
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout })
   const ask = makeAsker(rl)
+
+  // Show recommendation if available
+  if (roleId) {
+    const hint = getRecommendationHint(roleId, cwd)
+    if (hint) {
+      console.log(chalk.cyan(`\n  💡 Recommended: ${hint.modelLabel} (${hint.confidence}% confidence)`))
+      console.log(chalk.cyan.dim(`     ${hint.reason}\n`))
+    }
+  }
 
   console.log(chalk.white('  Choose a model:\n'))
   MODELS.forEach((m, i) => {
@@ -274,7 +336,7 @@ async function pickTemplate(role) {
 }
 
 // ─── Launch ───────────────────────────────────────────────────────────────────
-function launchClaudeCode(role, model, claudeCmd, template = null, extraArgs = []) {
+function launchClaudeCode(role, model, claudeCmd, template = null, extraArgs = [], priorContext = null) {
   const cwd = process.cwd()
   const modelInfo = MODELS.find(m => m.id === model) || { label: model, tier: 'balanced' }
   const tierColor = modelInfo.tier === 'premium' ? 'magenta' : modelInfo.tier === 'balanced' ? 'cyan' : 'green'
@@ -282,11 +344,12 @@ function launchClaudeCode(role, model, claudeCmd, template = null, extraArgs = [
   console.log(chalk.gray(`  Role    `) + `${role.emoji} ${chalk[role.colorName].bold(role.name)}`)
   console.log(chalk.gray(`  Model   `) + chalk[tierColor].bold(modelInfo.label) + chalk.gray(` (${model})`))
   if (template) console.log(chalk.gray(`  Template`) + ` ${chalk.yellow(template.label)}`)
+  if (priorContext) console.log(chalk.gray(`  Context `) + chalk.blue.dim(`Prior session injected`))
   console.log()
   console.log(chalk.gray(`  Writing CLAUDE.md and launching...`))
   console.log()
 
-  injectRole(role, model, template, cwd)
+  injectRole(role, model, template, cwd, priorContext)
 
   // Show pre-launch stats
   printPreLaunchStats(role, model, cwd)
@@ -334,6 +397,17 @@ function launchClaudeCode(role, model, claudeCmd, template = null, extraArgs = [
     // Save session + update stats
     saveSession(session)
     updateStats(session)
+
+    // Non-blocking: prompt for session notes (5s timeout)
+    if (process.stdin.isTTY) {
+      promptSessionNotesAsync(sessionId).then(notes => {
+        if (notes) {
+          saveSessionNotes(sessionId, notes)
+        }
+      }).catch(() => {
+        // Timeout or error — just continue
+      })
+    }
 
     // Print summary
     printSessionSummary(session)
@@ -426,15 +500,27 @@ async function handleSubcommand(cmd) {
     case 'watch': {
       printBanner()
       const claudeCmd = await ensureClaudeCode()
+      const cwd = process.cwd()
       const role = await pickRole(args.find(a => a.startsWith('--role='))?.split('=')[1])
       console.log()
-      const model = await pickModel(args.find(a => a.startsWith('--model='))?.split('=')[1])
+      const model = await pickModel(args.find(a => a.startsWith('--model='))?.split('=')[1], role.id)
       console.log()
-      printPreLaunchStats(role, model, process.cwd())
-      const launched = await launchWatch(role, model, claudeCmd, [])
+
+      // Detect prior context for watch mode
+      let priorContext = null
+      const relatedSessions = detectRelatedSessions(cwd, role.id)
+      if (relatedSessions.length > 0) {
+        const injectContext = await askYesNo(chalk.white('  Inject prior context? (y/n) [n]: '), false)
+        if (injectContext) {
+          priorContext = buildContextInjection(relatedSessions)
+        }
+      }
+
+      printPreLaunchStats(role, model, cwd)
+      const launched = await launchWatch(role, model, claudeCmd, [], priorContext)
       if (!launched) {
         // tmux not available — fall through to normal launch
-        launchClaudeCode(role, model, claudeCmd, null, [])
+        launchClaudeCode(role, model, claudeCmd, null, [], priorContext)
       }
       break
     }
@@ -442,13 +528,25 @@ async function handleSubcommand(cmd) {
     case 'use': {
       printBanner()
       const claudeCmd = await ensureClaudeCode()
+      const cwd = process.cwd()
       const role = await pickRole(args.find(a => a.startsWith('--role='))?.split('=')[1])
       console.log()
       const template = await pickTemplate(role)
       console.log()
-      const model = await pickModel(args.find(a => a.startsWith('--model='))?.split('=')[1])
+      const model = await pickModel(args.find(a => a.startsWith('--model='))?.split('=')[1], role.id)
       console.log()
-      launchClaudeCode(role, model, claudeCmd, template)
+
+      // Detect prior context for template-based launch
+      let priorContext = null
+      const relatedSessions = detectRelatedSessions(cwd, role.id)
+      if (relatedSessions.length > 0) {
+        const injectContext = await askYesNo(chalk.white('  Inject prior context? (y/n) [n]: '), false)
+        if (injectContext) {
+          priorContext = buildContextInjection(relatedSessions)
+        }
+      }
+
+      launchClaudeCode(role, model, claudeCmd, template, [], priorContext)
       break
     }
 
@@ -485,8 +583,25 @@ if (subcommand === '--help' || subcommand === '-h') {
 
   const role  = await pickRole(roleFlag?.split('=')[1])
   console.log()
-  const model = await pickModel(modelFlag?.split('=')[1])
+  const model = await pickModel(modelFlag?.split('=')[1], role.id)
   console.log()
 
-  launchClaudeCode(role, model, claudeCmd, null, extraArgs)
+  // Detect and offer prior session context
+  let priorContext = null
+  const relatedSessions = detectRelatedSessions(cwd, role.id)
+  if (relatedSessions.length > 0) {
+    console.log(chalk.blue('  Prior sessions found:'))
+    relatedSessions.forEach((s, i) => {
+      console.log(chalk.blue.dim(`    ${i + 1}. ${s.reason}`))
+    })
+    console.log()
+
+    const injectContext = await askYesNo(chalk.white('  Inject prior context? (y/n) [n]: '), false)
+    if (injectContext) {
+      priorContext = buildContextInjection(relatedSessions)
+    }
+    console.log()
+  }
+
+  launchClaudeCode(role, model, claudeCmd, null, extraArgs, priorContext)
 }
