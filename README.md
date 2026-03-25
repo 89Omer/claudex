@@ -13,7 +13,7 @@
 
 Pick your role. Pick your model. Launch with context. Track your costs.
 
-[![npm version](https://img.shields.io/npm/v/claude-x?color=cyan)](https://www.npmjs.com/package/claude-x)
+[![npm version](https://img.shields.io/npm/v/claude-x?color=cyan)](https://www.npmjs.com/package/@89omer/claude-x)
 [![license](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![node](https://img.shields.io/badge/node-18%2B-brightgreen)](https://nodejs.org)
 [![platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey)](#install)
