@@ -47,7 +47,7 @@ You run `claudex`. It sets up context and launches Claude Code for you.
 ```
 claudex
   │
-  ├── You pick: role (Dev / Designer / PM)
+  ├── You pick: role (Dev / Designer / PM / Marketing)
   ├── You pick: model (Opus / Sonnet / Haiku)
   ├── claudex writes role system prompt → CLAUDE.md
   └── Claude Code launches with your context active from message one
@@ -93,7 +93,7 @@ Your notes are stored and automatically suggested when you resume related sessio
 
 ```bash
 # Clone the repo
-git clone https://github.com/yourusername/claudex
+git clone https://github.com/89Omer/claudex
 cd claudex
 
 # Install dependencies
