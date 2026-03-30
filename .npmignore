@@ -1,0 +1,11 @@
+# Create .npmignore in your claudex folder
+code .npmignore
+```
+
+Add these lines:
+```
+.claude/
+CLAUDE.md
+.claudex.json
+node_modules/
+*.log

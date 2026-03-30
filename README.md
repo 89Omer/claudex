@@ -30,7 +30,8 @@ Claude Code is powerful — but it starts every session as a blank slate with no
 
 - 🎭 **Role system** — Developer, Designer, PM, or Marketing mode with tailored system prompts
 - 🤖 **Model picker** — Choose Opus 4.6, Sonnet 4.6, or Haiku 4.5 at launch
-- 💰 **Cost tracking** — See exactly what each session costs in USD
+- 💰 **Cost tracking** — See exactly what each session costs in USD (fixed accurate token parsing)
+- 🚨 **Budget alerts** — Get warned at 80% and 100% of your session budget; prompted to update limit after sessions that exceed it
 - 📊 **Stats dashboard** — Total spend, usage by role and model
 - 📋 **Session history** — Every session logged, resumable
 - 📝 **Session notes** — Save notes after each session, auto-suggested in future sessions
@@ -253,7 +254,7 @@ Add your own in `.claudex.json`:
 
 ---
 
-## Cost Tracking & Stats
+## Cost Tracking & Budget Alerts
 
 claudex tracks every session automatically. No setup needed.
 
@@ -288,6 +289,24 @@ claudex stats
 ```bash
 claudex history    # full session log
 ```
+
+### Budget alerts
+
+claudex monitors spend during a session and notifies you in the terminal when you're approaching or over your limit.
+
+- **At 80%** — a warning appears in your terminal: `⚠  claudex: Budget 80% used ($4.00 / $5.00)`
+- **At 100%** — an urgent warning appears: `🚨 claudex: Budget limit reached!`
+- **After the session** — if you exceeded your budget, claudex prompts you to update the limit:
+
+```
+  🚨 Session cost $5.23 exceeded budget limit of $5.00
+
+  Update budget? Enter new limit or press Enter to keep $5.00: $
+```
+
+Type a new number and press Enter to save it globally, or press Enter to keep the existing limit.
+
+The default budget is **$5.00**. Change it via `claudex init` or by answering the post-session prompt.
 
 ---
 
@@ -494,10 +513,9 @@ You get claudex's role system on top of a battle-tested skill and agent library.
 
 ## Contributing
 
-PRs welcome. Ideas for v2.1:
+PRs welcome. Ideas for v2.2:
 
 - [ ] Custom roles via config
-- [ ] Cost budget alerts (`--budget=5`)
 - [ ] Export session history to CSV/markdown
 - [ ] `claudex ls` — list all project configs
 - [ ] Neovim / JetBrains integration
