@@ -40,18 +40,30 @@ function parseProjectTokens(since) {
             const mtime = statSync(filePath).mtimeMs
             if (mtime < since) continue
             const lines = readFileSync(filePath, 'utf-8').trim().split('\n')
-            for (const line of lines) {
+            // Prefer result entry (definitive cumulative total)
+            let usedResult = false
+            for (let i = lines.length - 1; i >= 0; i--) {
               try {
-                const entry = JSON.parse(line)
-                if (entry.usage) {
+                const entry = JSON.parse(lines[i])
+                if (entry.type === 'result' && entry.usage) {
                   inputTokens += entry.usage.input_tokens || 0
                   outputTokens += entry.usage.output_tokens || 0
-                }
-                if (entry.message?.usage) {
-                  inputTokens += entry.message.usage.input_tokens || 0
-                  outputTokens += entry.message.usage.output_tokens || 0
+                  usedResult = true
+                  break
                 }
               } catch {}
+            }
+            // Fallback: sum assistant message usage
+            if (!usedResult) {
+              for (const line of lines) {
+                try {
+                  const entry = JSON.parse(line)
+                  if (entry.message?.usage) {
+                    inputTokens += entry.message.usage.input_tokens || 0
+                    outputTokens += entry.message.usage.output_tokens || 0
+                  }
+                } catch {}
+              }
             }
           } catch {}
         }

@@ -6,13 +6,13 @@ import chalk from 'chalk'
 import { existsSync, writeFileSync, readFileSync } from 'fs'
 import { join } from 'path'
 
-import { getConfig, getProjectConfig, MODELS, resolveModel } from './utils/config.js'
+import { getConfig, getProjectConfig, setConfig, MODELS, resolveModel } from './utils/config.js'
 import { getRole, ROLES } from './roles/index.js'
 import { runInit } from './utils/init.js'
 import { saveSession, updateStats, saveProjectMemory, getProjectMemory, loadSessions, saveSessionNotes } from './utils/store.js'
 import { getRecommendationHint } from './utils/recommendation.js'
 import { detectRelatedSessions, buildContextInjection } from './utils/continuity.js'
-import { calcCost, formatCost, formatTokens, formatDuration, getClaudeCodeSessions } from './utils/cost.js'
+import { calcCost, formatCost, formatTokens, formatDuration, getClaudeCodeSessions, parseRecentSessionTokens } from './utils/cost.js'
 import { getTemplates, formatTemplateList } from './utils/templates.js'
 import { printSessionSummary, printHistory, printStats, printResumePicker, printTemplatePicker, printPreLaunchStats } from './utils/display.js'
 import { launchWatch, runWatcher, writeWatchState } from './utils/watch.js'
@@ -367,6 +367,7 @@ function launchClaudeCode(role, model, claudeCmd, template = null, extraArgs = [
   const sessionId = Date.now().toString(36)
   const claudeArgs = ['--model', model, ...extraArgs]
   const isWindows = process.platform === 'win32'
+  const budget = config.budgetAlert || 0
 
   const claude = spawn(claudeCmd, claudeArgs, {
     stdio: 'inherit',
@@ -375,11 +376,41 @@ function launchClaudeCode(role, model, claudeCmd, template = null, extraArgs = [
     shell: isWindows
   })
 
+  // ── Budget monitoring ─────────────────────────────────────────────────────
+  let budgetWarned80 = false
+  let budgetWarned100 = false
+  const budgetMonitor = budget > 0 ? setInterval(() => {
+    const tokens = parseRecentSessionTokens(sessionStart - 2000)
+    if (!tokens) return
+    const currentCost = calcCost(tokens.inputTokens, tokens.outputTokens, model)
+    const pct = (currentCost / budget) * 100
+
+    if (!budgetWarned80 && pct >= 80 && pct < 100) {
+      budgetWarned80 = true
+      process.stderr.write(
+        `\n  ⚠  claudex: Budget ${pct.toFixed(0)}% used` +
+        ` (${formatCost(currentCost)} / ${formatCost(budget)})\n\n`
+      )
+    }
+    if (!budgetWarned100 && pct >= 100) {
+      budgetWarned100 = true
+      process.stderr.write(
+        `\n  🚨 claudex: Budget limit reached!` +
+        ` ${formatCost(currentCost)} spent (limit: ${formatCost(budget)})\n\n`
+      )
+    }
+  }, 30000) : null
+
   claude.on('close', async (code) => {
+    if (budgetMonitor) clearInterval(budgetMonitor)
     const duration = Date.now() - sessionStart
 
-    // Try to get real token counts from Claude Code's session files
-    // Estimate as fallback (rough: 1 token ≈ 4 chars, assume avg session)
+    // Read real token counts from Claude Code's JSONL session files
+    const tokens = parseRecentSessionTokens(sessionStart - 2000)
+    const inputTokens = tokens?.inputTokens || 0
+    const outputTokens = tokens?.outputTokens || 0
+    const cost = calcCost(inputTokens, outputTokens, model)
+
     const session = {
       id: sessionId,
       role: role.id,
@@ -387,9 +418,9 @@ function launchClaudeCode(role, model, claudeCmd, template = null, extraArgs = [
       startTime: sessionStart,
       endTime: Date.now(),
       duration,
-      inputTokens: 0,
-      outputTokens: 0,
-      cost: 0,
+      inputTokens,
+      outputTokens,
+      cost,
       project: cwd,
       template: template?.key || null,
     }
@@ -411,6 +442,27 @@ function launchClaudeCode(role, model, claudeCmd, template = null, extraArgs = [
 
     // Print summary
     printSessionSummary(session)
+
+    // ── Budget exceeded: offer to update limit ──────────────────────────────
+    if (budget > 0 && cost > budget && process.stdin.isTTY) {
+      console.log()
+      console.log(chalk.red(`  🚨 Session cost ${formatCost(cost)} exceeded budget limit of ${formatCost(budget)}`))
+      console.log()
+      const rl = readline.createInterface({ input: process.stdin, output: process.stdout })
+      const answer = await new Promise(resolve => {
+        const timeout = setTimeout(() => { rl.close(); resolve('') }, 10000)
+        rl.question(
+          chalk.white(`  Update budget? Enter new limit or press Enter to keep ${formatCost(budget)}: $`),
+          val => { clearTimeout(timeout); rl.close(); resolve(val.trim()) }
+        )
+      })
+      if (answer && !isNaN(parseFloat(answer)) && parseFloat(answer) > 0) {
+        const newBudget = parseFloat(answer)
+        setConfig('budgetAlert', newBudget)
+        console.log(chalk.green(`  Budget updated to ${formatCost(newBudget)}\n`))
+      }
+    }
+
     process.exit(code || 0)
   })
 

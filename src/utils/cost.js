@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync, existsSync } from 'fs'
+import { readdirSync, readFileSync, existsSync, statSync } from 'fs'
 import { join } from 'path'
 import { homedir } from 'os'
 import { PRICING } from './config.js'
@@ -85,20 +85,25 @@ export function parseClaudeSessionTokens(sessionId) {
 function parseJSONLTokens(filePath) {
   try {
     const lines = readFileSync(filePath, 'utf-8').trim().split('\n')
-    let inputTokens = 0
-    let outputTokens = 0
-    let found = false
 
+    // Prefer the result entry — it's the definitive cumulative total for the session
+    for (let i = lines.length - 1; i >= 0; i--) {
+      try {
+        const entry = JSON.parse(lines[i])
+        if (entry.type === 'result' && entry.usage) {
+          return {
+            inputTokens: entry.usage.input_tokens || 0,
+            outputTokens: entry.usage.output_tokens || 0,
+          }
+        }
+      } catch {}
+    }
+
+    // Fallback: sum per-message usage from assistant entries (session still in progress)
+    let inputTokens = 0, outputTokens = 0, found = false
     for (const line of lines) {
       try {
         const entry = JSON.parse(line)
-        // Claude Code logs usage in message entries
-        if (entry.usage) {
-          inputTokens += entry.usage.input_tokens || 0
-          outputTokens += entry.usage.output_tokens || 0
-          found = true
-        }
-        // Also check nested message format
         if (entry.message?.usage) {
           inputTokens += entry.message.usage.input_tokens || 0
           outputTokens += entry.message.usage.output_tokens || 0
@@ -110,6 +115,34 @@ function parseJSONLTokens(filePath) {
     return found ? { inputTokens, outputTokens } : null
   } catch {}
   return null
+}
+
+// Parse tokens from JSONL files modified after `since` (ms timestamp)
+export function parseRecentSessionTokens(since) {
+  if (!existsSync(PROJECTS_DIR)) return null
+  let inputTokens = 0, outputTokens = 0, found = false
+
+  try {
+    for (const projectDir of readdirSync(PROJECTS_DIR)) {
+      const projectPath = join(PROJECTS_DIR, projectDir)
+      try {
+        for (const file of readdirSync(projectPath).filter(f => f.endsWith('.jsonl'))) {
+          const filePath = join(projectPath, file)
+          try {
+            if (statSync(filePath).mtimeMs < since) continue
+            const tokens = parseJSONLTokens(filePath)
+            if (tokens) {
+              inputTokens += tokens.inputTokens
+              outputTokens += tokens.outputTokens
+              found = true
+            }
+          } catch {}
+        }
+      } catch {}
+    }
+  } catch {}
+
+  return found ? { inputTokens, outputTokens } : null
 }
 
 // Get latest Claude Code session ID from ~/.claude
