@@ -28,9 +28,10 @@ Claude Code is powerful — but it starts every session as a blank slate with no
 
 **claudex fixes that.** It wraps Claude Code with:
 
+- 🗺️ **Repo Map** — Auto-generates a compact codebase visualization (file tree, exports, git context) so Claude knows where to look from the first prompt. Saves tokens by eliminating blind file exploration
 - 🎭 **Role system** — Developer, Designer, PM, or Marketing mode with tailored system prompts
-- 🤖 **Model picker** — Choose Opus 4.6, Sonnet 4.6, or Haiku 4.5 at launch
-- 💰 **Cost tracking** — See exactly what each session costs in USD (fixed accurate token parsing)
+- 🤖 **Model picker** — Choose Opus 4.7, Opus 4.6, Sonnet 4.6, or Haiku 4.5 at launch
+- 💰 **Cost tracking** — See exactly what each session costs in USD (accurate token parsing)
 - 🚨 **Budget alerts** — Get warned at 80% and 100% of your session budget; prompted to update limit after sessions that exceed it
 - 📊 **Stats dashboard** — Total spend, usage by role and model
 - 📋 **Session history** — Every session logged, resumable
@@ -48,15 +49,22 @@ You run `claudex`. It sets up context and launches Claude Code for you.
 ```
 claudex
   │
+  ├── Auto-generates repo map (file tree, exports, git context, dependencies)
   ├── You pick: role (Dev / Designer / PM / Marketing)
-  ├── You pick: model (Opus / Sonnet / Haiku)
-  ├── claudex writes role system prompt → CLAUDE.md
-  └── Claude Code launches with your context active from message one
+  ├── You pick: model (Opus 4.7 / Opus 4.6 / Sonnet / Haiku)
+  ├── claudex writes role + repo map → CLAUDE.md
+  └── Claude Code launches with full codebase awareness from message one
 ```
 
 When you exit, claudex shows a session summary and optionally saves notes:
 
 ```
+  Role      🧑‍💻 Developer
+  Model     Sonnet 4.6
+  Repo Map  21 files | main | node | .js(15) .json(2) | ~847 tokens
+
+  Writing CLAUDE.md with repo map and launching...
+
   ────────────────────────────────────────────
   claudex — session ended
   ────────────────────────────────────────────
@@ -71,11 +79,6 @@ When you exit, claudex shows a session summary and optionally saves notes:
   All-time  $2.34 across 28 sessions
 
   ────────────────────────────────────────────
-
-  Save session notes for next time? (Ctrl+D to finish, or press Enter to skip)
-  > Fixed the auth middleware, added tests, need to review in next session
-
-  ✓ Notes saved
 ```
 
 Your notes are stored and automatically suggested when you resume related sessions.
@@ -145,11 +148,12 @@ You'll see role and model pickers. Press Enter to accept defaults, or type a num
 
   Choose a model:
 
-    1.  Opus 4.6        Most capable — coding, agents, 1M context, best reasoning
-    2.  Sonnet 4.6      Recommended — near-Opus performance, fast, 1M context     ← last used
-    3.  Haiku 4.5       Fastest & cheapest — quick tasks, high volume
+    1.  Opus 4.7        Latest flagship — fastest Opus, best reasoning & coding
+    2.  Opus 4.6        Prior flagship — coding, agents, 1M context
+    3.  Sonnet 4.6      Recommended — near-Opus performance, fast, 1M context     ← last used
+    4.  Haiku 4.5       Fastest & cheapest — quick tasks, high volume
 
-  Enter number [2]:
+  Enter number [3]:
 ```
 
 ---
@@ -158,7 +162,8 @@ You'll see role and model pickers. Press Enter to accept defaults, or type a num
 
 | Command | Description |
 |---|---|
-| `claudex` | Interactive launcher — pick role + model |
+| `claudex` | Interactive launcher — pick role + model, auto-generates repo map |
+| `claudex map` | Preview the auto-generated repo map without launching |
 | `claudex doctor` | Check setup, config, supported models, and Claude Code availability |
 | `claudex context` | Show the active role/model for this project and where they came from |
 | `claudex watch` | Launch with a live stats side panel in `tmux` |
@@ -216,6 +221,7 @@ Best for: landing page copy, campaign plans, brand messaging, blog outlines, and
 
 | Model | Shorthand | Best for | Cost |
 |---|---|---|---|
+| Opus 4.7 | `opus4.7` | Latest flagship, fastest Opus, best reasoning | $5 / $25 per 1M tokens |
 | Opus 4.6 | `opus` | Complex reasoning, long tasks, agents | $5 / $25 per 1M tokens |
 | Sonnet 4.6 | `sonnet` | Everyday coding, near-Opus quality ⭐ | $3 / $15 per 1M tokens |
 | Haiku 4.5 | `haiku` | Quick tasks, high volume, cheapest | $0.80 / $4 per 1M tokens |
@@ -375,7 +381,7 @@ Create `.claudex.json` in any project to set per-project defaults:
 ```json
 {
   "defaultRole": "design",
-  "defaultModel": "claude-opus-4-6",
+  "defaultModel": "claude-opus-4-7",
   "templates": {
     "design": {
       "brandreview": {
@@ -397,9 +403,11 @@ This repo does not include a formal automated test suite yet. The fastest smoke 
 node src/index.js --help
 node src/index.js doctor
 node src/index.js context
+node src/index.js map
 node --check src/index.js
 node --check src/utils/doctor.js
 node --check src/utils/init.js
+node --check src/utils/repomap.js
 ```
 
 For manual verification of the interactive flow:
@@ -412,9 +420,84 @@ node src/index.js watch
 
 ---
 
+## Repo Map — The Killer Feature
+
+Every time you run `claudex`, it auto-generates a compact repo map and injects it into `CLAUDE.md` alongside your role prompt. Claude sees the full codebase structure from the first message — no blind file exploration.
+
+```bash
+claudex map    # preview the map without launching
+```
+
+The map includes:
+
+- **File tree** — all git-tracked source files, smart directory collapsing for large repos
+- **Code signatures** — every exported function, class, type, and constant from up to 30 key files
+- **Git context** — current branch, last 8 commits, uncommitted changes with clear labels (`[modified]`, `[untracked]`, etc.)
+- **Project metadata** — name, version, dependencies, scripts, framework detection (Next.js, React, Express, Tailwind, Prisma, etc.)
+- **Token estimate** — shows exactly how many tokens the map costs
+
+Example output:
+
+```
+# Repo Map
+> Auto-generated by claudex. Navigate with this map — read files only when you need full implementation.
+
+## Project: @89omer/claude-x v2.1.0
+Type: node (module)
+
+## Git
+Branch: `main` | Remote: https://github.com/89Omer/claudex.git
+Uncommitted (3):
+  [modified] src/index.js
+  [untracked] src/utils/repomap.js
+Recent commits:
+  28a3f9e  Here's what changed
+  4e2c212  Bugs fixed: session cost tracking
+
+## Files (20 tracked)
+  src/
+    index.js
+    roles/
+      index.js
+    utils/
+      config.js
+      cost.js
+      ...
+
+## Key Exports & Functions
+**src/utils/config.js**: MODELS, PRICING, fn getConfig(), fn resolveModel()
+**src/roles/index.js**: ROLES, fn getRole()
+
+---
+_Map: ~847 tokens | 20 files | 14 modules scanned_
+```
+
+### .claudexignore
+
+Create a `.claudexignore` file in your project root to exclude paths from the repo map:
+
+```
+# Directories
+generated/
+coverage/
+__snapshots__/
+
+# File patterns
+*.test.js
+*.spec.ts
+*.stories.tsx
+
+# Specific files
+scripts/migrate-legacy.js
+```
+
+Patterns support `dir/` (directory), `*.ext` (extension), and basic glob matching.
+
+---
+
 ## How Role Injection Works
 
-claudex writes your role's system prompt into `CLAUDE.md` in your project:
+claudex writes your role's system prompt and repo map into `CLAUDE.md` in your project:
 
 ```markdown
 # claudex — Active Role: Designer 🎨
@@ -423,11 +506,16 @@ claudex writes your role's system prompt into `CLAUDE.md` in your project:
 You are an expert UI/UX designer and frontend developer. Focus on:
 - User experience, accessibility (WCAG), and visual hierarchy
 ...
+
+# Repo Map
+> Auto-generated by claudex. Navigate with this map...
+(file tree, signatures, git context)
+
 <!-- claudex:role:design -->
 <!-- claudex:model:claude-sonnet-4-6 -->
 ```
 
-Claude Code reads `CLAUDE.md` automatically on startup. Your role is active from message one.
+Claude Code reads `CLAUDE.md` automatically on startup. Your role and repo map are active from message one.
 
 **Your existing `CLAUDE.md` is safe** — claudex preserves any content you've written below the role block.
 
@@ -513,9 +601,10 @@ You get claudex's role system on top of a battle-tested skill and agent library.
 
 ## Contributing
 
-PRs welcome. Ideas for v2.2:
+PRs welcome. Ideas for next:
 
 - [ ] Custom roles via config
+- [ ] Tree-sitter based signatures (deeper than regex)
 - [ ] Export session history to CSV/markdown
 - [ ] `claudex ls` — list all project configs
 - [ ] Neovim / JetBrains integration

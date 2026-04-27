@@ -100,7 +100,7 @@ export function printSessionSummary(session) {
   const haikusModel = MODELS.find(x => x.id === 'claude-haiku-4-5')
   const sonnetCost = calcCost(session.inputTokens || 0, session.outputTokens || 0, 'claude-sonnet-4-6')
   const haikuCost = calcCost(session.inputTokens || 0, session.outputTokens || 0, 'claude-haiku-4-5')
-  const showSavings = session.model === 'claude-opus-4-6' && (session.cost || 0) > 0.01
+  const showSavings = (session.model === 'claude-opus-4-7' || session.model === 'claude-opus-4-6') && (session.cost || 0) > 0.01
 
   const c = cols()
   console.log()

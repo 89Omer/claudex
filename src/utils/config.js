@@ -15,13 +15,15 @@ const store = new Conf({
 
 // All selectable Claude models
 export const MODELS = [
-  { id: 'claude-opus-4-6',    label: 'Opus 4.6',    desc: 'Most capable — coding, agents, 1M context, best reasoning', tier: 'premium' },
+  { id: 'claude-opus-4-7',    label: 'Opus 4.7',    desc: 'Latest flagship — fastest Opus, best reasoning & coding',   tier: 'premium' },
+  { id: 'claude-opus-4-6',    label: 'Opus 4.6',    desc: 'Prior flagship — coding, agents, 1M context',               tier: 'premium' },
   { id: 'claude-sonnet-4-6',  label: 'Sonnet 4.6',  desc: 'Recommended — near-Opus performance, fast, 1M context',     tier: 'balanced' },
   { id: 'claude-haiku-4-5',   label: 'Haiku 4.5',   desc: 'Fastest & cheapest — quick tasks, high volume',             tier: 'fast' },
 ]
 
 // Pricing per 1M tokens (input / output)
 export const PRICING = {
+  'claude-opus-4-7':   { input: 5.00,  output: 25.00 },
   'claude-opus-4-6':   { input: 5.00,  output: 25.00 },
   'claude-sonnet-4-6': { input: 3.00,  output: 15.00 },
   'claude-haiku-4-5':  { input: 0.80,  output: 4.00  },
@@ -53,9 +55,11 @@ export function resolveModel(input) {
   const lower = input.toLowerCase().trim()
   // Shorthand aliases
   const aliases = {
-    'opus':    'claude-opus-4-6',
-    'sonnet':  'claude-sonnet-4-6',
-    'haiku':   'claude-haiku-4-5',
+    'opus':      'claude-opus-4-6',
+    'opus4.7':   'claude-opus-4-7',
+    'opus4.6':   'claude-opus-4-6',
+    'sonnet':    'claude-sonnet-4-6',
+    'haiku':     'claude-haiku-4-5',
   }
   if (aliases[lower]) return aliases[lower]
   // Full model id passed directly
@@ -64,6 +68,7 @@ export function resolveModel(input) {
 }
 
 export const CONTEXT_WINDOWS = {
+  'claude-opus-4-7':   200000,
   'claude-opus-4-6':   200000,
   'claude-sonnet-4-6': 200000,
   'claude-haiku-4-5':  200000,

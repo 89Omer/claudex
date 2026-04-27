@@ -1,6 +1,6 @@
 {
   "name": "@89omer/claude-x",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "description": "A supercharged Claude Code CLI wrapper with roles, model selection, cost tracking, and session history",
   "type": "module",
   "bin": {

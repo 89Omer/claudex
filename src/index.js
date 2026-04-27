@@ -17,6 +17,7 @@ import { getTemplates, formatTemplateList } from './utils/templates.js'
 import { printSessionSummary, printHistory, printStats, printResumePicker, printTemplatePicker, printPreLaunchStats } from './utils/display.js'
 import { launchWatch, runWatcher, writeWatchState } from './utils/watch.js'
 import { printDoctorReport, printContextReport } from './utils/doctor.js'
+import { generateRepoMap, getRepoMapStats, printRepoMap } from './utils/repomap.js'
 
 // ─── CLI Args ─────────────────────────────────────────────────────────────────
 const args = process.argv.slice(2)
@@ -120,6 +121,7 @@ function printHelp() {
   console.log(chalk.white('  Commands:\n'))
   console.log(chalk.gray('    claudex doctor      Check setup, config, and Claude Code availability'))
   console.log(chalk.gray('    claudex context     Explain the active role/model/context for this project'))
+  console.log(chalk.gray('    claudex map         Print the auto-generated repo map (debug/preview)'))
   console.log(chalk.gray('    claudex watch       Launch with live stats in split terminal (requires tmux)'))
   console.log(chalk.gray('    claudex init        Setup wizard'))
   console.log(chalk.gray('    claudex models      List available models'))
@@ -129,7 +131,7 @@ function printHelp() {
   console.log(chalk.gray('    claudex use         Pick a prompt template then launch'))
   console.log()
   console.log(chalk.white('  Roles:   ') + chalk.gray(Object.keys(ROLES).join('  ')))
-  console.log(chalk.white('  Models:  ') + chalk.gray('opus  sonnet  haiku'))
+  console.log(chalk.white('  Models:  ') + chalk.gray('opus  opus4.7  sonnet  haiku'))
   console.log()
 }
 
@@ -145,21 +147,22 @@ function printModels() {
   console.log(chalk.gray('  Usage:  claudex --model=sonnet\n'))
 }
 
-function buildClaudeMd(role, model, template = null, userContent = '', priorContext = null) {
+function buildClaudeMd(role, model, template = null, userContent = '', priorContext = null, repoMap = null) {
   const modelInfo = MODELS.find(m => m.id === model) || { label: model }
   const templateBlock = template ? `\n\n## Active Template: ${template.label}\n${template.prompt}` : ''
   const contextBlock = priorContext ? `\n\n${priorContext}\n\n---` : ''
+  const mapBlock = repoMap ? `\n\n${repoMap}` : ''
   const separator = userContent ? `\n\n---\n\n${userContent}` : ''
   return `# claudex — Active Role: ${role.name} ${role.emoji}
 # Model: ${modelInfo.label} (${model})
 
-${role.systemPrompt}${templateBlock}${contextBlock}
+${role.systemPrompt}${templateBlock}${contextBlock}${mapBlock}
 <!-- claudex:role:${role.id} -->
 <!-- claudex:model:${model} -->${separator}
 `.trim() + '\n'
 }
 
-function injectRole(role, model, template = null, cwd, priorContext = null) {
+function injectRole(role, model, template = null, cwd, priorContext = null, repoMap = null) {
   const claudeMdPath = join(cwd, 'CLAUDE.md')
   let userContent = ''
   if (existsSync(claudeMdPath)) {
@@ -177,7 +180,7 @@ function injectRole(role, model, template = null, cwd, priorContext = null) {
       userContent = existing.trim()
     }
   }
-  writeFileSync(claudeMdPath, buildClaudeMd(role, model, template, userContent, priorContext))
+  writeFileSync(claudeMdPath, buildClaudeMd(role, model, template, userContent, priorContext, repoMap))
 }
 
 function makeAsker(rl) {
@@ -341,15 +344,27 @@ function launchClaudeCode(role, model, claudeCmd, template = null, extraArgs = [
   const modelInfo = MODELS.find(m => m.id === model) || { label: model, tier: 'balanced' }
   const tierColor = modelInfo.tier === 'premium' ? 'magenta' : modelInfo.tier === 'balanced' ? 'cyan' : 'green'
 
+  // Generate repo map
+  const repoMap = generateRepoMap(cwd)
+  const mapStats = getRepoMapStats(cwd)
+
   console.log(chalk.gray(`  Role    `) + `${role.emoji} ${chalk[role.colorName].bold(role.name)}`)
   console.log(chalk.gray(`  Model   `) + chalk[tierColor].bold(modelInfo.label) + chalk.gray(` (${model})`))
   if (template) console.log(chalk.gray(`  Template`) + ` ${chalk.yellow(template.label)}`)
   if (priorContext) console.log(chalk.gray(`  Context `) + chalk.blue.dim(`Prior session injected`))
+  if (mapStats) {
+    const mapTokens = repoMap ? Math.ceil(repoMap.length / 3.8) : 0
+    console.log(chalk.gray(`  Repo Map`) + chalk.green(` ${mapStats.totalFiles} files`) + chalk.gray(` | ${mapStats.branch || 'detached'}`) +
+      (mapStats.dirty > 0 ? chalk.yellow(` | ${mapStats.dirty} uncommitted`) : '') +
+      chalk.gray(` | ${mapStats.framework}`) +
+      chalk.gray(` | ${mapStats.languages}`) +
+      chalk.gray(` | ~${mapTokens} tokens`))
+  }
   console.log()
-  console.log(chalk.gray(`  Writing CLAUDE.md and launching...`))
+  console.log(chalk.gray(`  Writing CLAUDE.md with repo map and launching...`))
   console.log()
 
-  injectRole(role, model, template, cwd, priorContext)
+  injectRole(role, model, template, cwd, priorContext, repoMap)
 
   // Show pre-launch stats
   printPreLaunchStats(role, model, cwd)
@@ -491,6 +506,12 @@ async function handleSubcommand(cmd) {
 
     case 'context':
       printContextReport(process.cwd())
+      process.exit(0)
+
+    case 'map':
+      printBanner()
+      console.log(chalk.white('  Repo Map Preview\n'))
+      printRepoMap(process.cwd())
       process.exit(0)
 
     case '--help':
