@@ -17,7 +17,7 @@ import { getTemplates, formatTemplateList } from './utils/templates.js'
 import { printSessionSummary, printHistory, printStats, printResumePicker, printTemplatePicker, printPreLaunchStats } from './utils/display.js'
 import { launchWatch, runWatcher, writeWatchState } from './utils/watch.js'
 import { printDoctorReport, printContextReport } from './utils/doctor.js'
-import { generateRepoMap, getRepoMapStats, printRepoMap } from './utils/repomap.js'
+import { generateRepoMap, getRepoMapStats, printRepoMap, renderCompactLangBar } from './utils/repomap.js'
 
 // ─── CLI Args ─────────────────────────────────────────────────────────────────
 const args = process.argv.slice(2)
@@ -357,8 +357,9 @@ function launchClaudeCode(role, model, claudeCmd, template = null, extraArgs = [
     console.log(chalk.gray(`  Repo Map`) + chalk.green(` ${mapStats.totalFiles} files`) + chalk.gray(` | ${mapStats.branch || 'detached'}`) +
       (mapStats.dirty > 0 ? chalk.yellow(` | ${mapStats.dirty} uncommitted`) : '') +
       chalk.gray(` | ${mapStats.framework}`) +
-      chalk.gray(` | ${mapStats.languages}`) +
       chalk.gray(` | ~${mapTokens} tokens`))
+    const langBar = renderCompactLangBar(cwd)
+    if (langBar) console.log(chalk.gray(`           `) + langBar)
   }
   console.log()
   console.log(chalk.gray(`  Writing CLAUDE.md with repo map and launching...`))

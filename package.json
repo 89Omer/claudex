@@ -4,8 +4,8 @@
   "description": "A supercharged Claude Code CLI wrapper with roles, model selection, cost tracking, and session history",
   "type": "module",
   "bin": {
-    "claudex": "./src/index.js",
-    "claude-x": "./src/index.js"
+    "claudex": "src/index.js",
+    "claude-x": "src/index.js"
   },
   "scripts": {
     "start": "node src/index.js"
@@ -25,7 +25,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/89Omer/claudex"
+    "url": "git+https://github.com/89Omer/claudex.git"
   },
   "homepage": "https://github.com/89Omer/claudex#readme",
   "bugs": {
